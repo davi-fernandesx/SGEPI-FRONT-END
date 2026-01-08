@@ -1,0 +1,28 @@
+# Dependências (Nunca envie isso!)
+node_modules
+.pnp
+.pnp.js
+
+# Pastas de Build (Produção)
+build
+dist
+
+# Arquivos de Segurança e Ambiente (Chaves de API, senhas)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs de erro
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de Sistema Operacional (Lixo do Windows/Mac)
+.DS_Store
+Thumbs.db
+
+# Configurações de Editor (Opcional, mas bom ter)
+.vscode
+.idea
