@@ -1,17 +1,16 @@
 import { useState } from "react";
 
-// 1. DADOS MOCKADOS 
+// 1. DADOS MOCKADOS
 const mockFuncionarios = [
-  { id: 1, nome: "João Silva", setor: "Produção", matricula: "483920" },
-  { id: 2, nome: "Maria Santos", setor: "Segurança", matricula: "739104" },
-  { id: 3, nome: "Carlos Oliveira", setor: "Manutenção", matricula: "102938" },
+  { id: 1, nome: "João Silva", setor: "Produção", matricula: "483920", cargo: "Operador" },
+  { id: 2, nome: "Maria Santos", setor: "Segurança", matricula: "739104", cargo: "Técnica" },
+  { id: 3, nome: "Carlos Oliveira", setor: "Manutenção", matricula: "102938", cargo: "Eletricista" },
 ];
 
 const mockEpis = [
-  { id: 1, nome: "Capacete de Segurança", tamanhos: ["P", "M", "G"] },
-  { id: 2, nome: "Luva de Raspa", tamanhos: ["P", "M", "G", "GG"] },
-  { id: 3, nome: "Sapato de Segurança", tamanhos: ["38", "40", "42", "44"] },
-  { id: 4, nome: "Óculos de Proteção", tamanhos: ["Único"] },
+  { id: 1, nome: "Capacete de Segurança", ca: "32.145", tamanhos: ["P", "M", "G"] },
+  { id: 2, nome: "Luva de Raspa", ca: "15.400", tamanhos: ["P", "M", "G", "GG"] },
+  { id: 3, nome: "Sapato de Segurança", ca: "40.222", tamanhos: ["38", "40", "42", "44"] },
 ];
 
 const mockEntregasInicial = [
@@ -19,25 +18,34 @@ const mockEntregasInicial = [
     id: 101,
     funcionario: 1, // João
     dataEntrega: "2024-01-20",
-    assinatura: "Assinado digitalmente via Tablet",
-    itens: [
-      { id: "abc-1", epi: 1, tamanho: "M", quantidade: 1 },
-      { id: "abc-2", epi: 2, tamanho: "G", quantidade: 2 },
-    ]
+    itens: [{ id: "a1", epi: 1, tamanho: "M", quantidade: 1 }]
+  },
+  {
+    id: 102,
+    funcionario: 2, // Maria
+    dataEntrega: "2024-02-15", 
+    itens: [{ id: "a2", epi: 2, tamanho: "P", quantidade: 5 }]
+  },
+  {
+    id: 103,
+    funcionario: 3, // Carlos
+    dataEntrega: "2024-03-10",
+    itens: [{ id: "a3", epi: 3, tamanho: "42", quantidade: 1 }]
   }
 ];
 
 function Entregas() {
   const [entregas, setEntregas] = useState(mockEntregasInicial);
   const [modalAberto, setModalAberto] = useState(false);
-
-  // 2. STATE PARA A BARRA DE BUSCA
+  
+  // ESTADOS DE FILTRO
   const [busca, setBusca] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
-  // States do Modal 
+  // States do Modal de Cadastro
   const [funcionario, setFuncionario] = useState("");
   const [dataEntrega, setDataEntrega] = useState("");
-  const [assinatura, setAssinatura] = useState("");
   const [itens, setItens] = useState([]);
   const [epi, setEpi] = useState("");
   const [tamanho, setTamanho] = useState("");
@@ -46,160 +54,237 @@ function Entregas() {
   // Helpers
   const formatarData = (data) => {
     if (!data) return "--";
-    return new Date(data).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+    // Ajuste para fuso horário brasileiro na exibição
+    const [ano, mes, dia] = data.split("-");
+    return `${dia}/${mes}/${ano}`;
   };
 
-  // 3. LÓGICA DE FILTRO (NOME OU MATRÍCULA)
+  // --- LÓGICA DE FILTRAGEM AVANÇADA ---
   const entregasFiltradas = entregas.filter((entrega) => {
-    // Encontra o funcionário dono desta entrega
     const func = mockFuncionarios.find(f => f.id === entrega.funcionario);
-
-    // Se por algum motivo o funcionário não existir nos dados, não mostra
     if (!func) return false;
 
+    // 1. Filtro por Texto (Nome ou Matrícula)
     const termo = busca.toLowerCase();
+    const matchTexto = func.nome.toLowerCase().includes(termo) || func.matricula.includes(termo);
 
-    // Verifica se o termo digitado está no Nome OU na Matrícula
-    return (
-      func.nome.toLowerCase().includes(termo) ||
-      func.matricula.includes(termo)
-    );
+    // 2. Filtro por Data (Se estiverem preenchidas)
+    let matchData = true;
+    if (dataInicio) {
+        matchData = matchData && entrega.dataEntrega >= dataInicio;
+    }
+    if (dataFim) {
+        matchData = matchData && entrega.dataEntrega <= dataFim;
+    }
+
+    return matchTexto && matchData;
   });
 
-  // --- Funções do Modal  ---
+  // --- FUNÇÃO: GERAR RELATÓRIO GERAL (TABELA) ---
+  const imprimirRelatorioGeral = () => {
+    const periodo = dataInicio && dataFim 
+        ? `Período: ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
+        : "Relatório Geral (Todo o Período)";
+
+    const conteudoHTML = `
+      <html>
+        <head>
+          <title>Relatório de Entregas</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; font-size: 12px; }
+            h1 { text-align: center; margin-bottom: 5px; }
+            p { text-align: center; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { background-color: #eee; text-align: left; padding: 8px; border: 1px solid #999; font-size: 11px; text-transform: uppercase;}
+            td { padding: 8px; border: 1px solid #ccc; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .total { font-weight: bold; text-align: right; padding-top: 10px; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <h1>RELATÓRIO DE SAÍDA DE EPIs</h1>
+          <p>${periodo}</p>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Colaborador / Matrícula</th>
+                <th>Setor</th>
+                <th>Itens Entregues (Descrição - Tam - Qtd)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entregasFiltradas.map(ent => {
+                const func = mockFuncionarios.find(f => f.id === ent.funcionario);
+                const listaItens = ent.itens.map(i => {
+                    const nomeEpi = mockEpis.find(e => e.id === i.epi)?.nome;
+                    return `${nomeEpi} (${i.tamanho}) - <b>${i.quantidade}un</b>`;
+                }).join('<br/>');
+
+                return `
+                  <tr>
+                    <td style="white-space:nowrap">${formatarData(ent.dataEntrega)}</td>
+                    <td>${func?.nome}<br/><small style="color:#666">${func?.matricula}</small></td>
+                    <td>${func?.setor}</td>
+                    <td>${listaItens}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          <div class="total">Total de Registros: ${entregasFiltradas.length}</div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+
+    const win = window.open('', '', 'width=900,height=600');
+    win.document.write(conteudoHTML);
+    win.document.close();
+  };
+
+  // Funções do Modal
   function abrirModal() {
-    setFuncionario("");
-    setDataEntrega(new Date().toISOString().split('T')[0]);
-    setAssinatura("");
-    setItens([]);
-    setEpi("");
-    setTamanho("");
-    setQuantidade(1);
+    setFuncionario(""); setDataEntrega(new Date().toISOString().split('T')[0]);
+    setItens([]); setEpi(""); setTamanho(""); setQuantidade(1);
     setModalAberto(true);
   }
-
   function adicionarItem() {
-    if (!epi || !quantidade) { alert("Selecione um EPI e a quantidade."); return; }
-    const epiObj = mockEpis.find(e => e.id === Number(epi));
-    if (epiObj?.tamanhos.length > 0 && !tamanho) { alert("Selecione o tamanho."); return; }
-
-    setItens((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      epi: Number(epi),
-      tamanho: tamanho || "Único",
-      quantidade: Number(quantidade),
-    }]);
+    if (!epi || !quantidade) return;
+    setItens((prev) => [...prev, { id: Date.now(), epi: Number(epi), tamanho: tamanho || "Único", quantidade: Number(quantidade) }]);
     setEpi(""); setTamanho(""); setQuantidade(1);
   }
-
-  function removerItem(id) {
-    setItens((prev) => prev.filter((i) => i.id !== id));
-  }
-
+  function removerItem(id) { setItens((prev) => prev.filter((i) => i.id !== id)); }
   function salvarEntrega() {
-    if (!funcionario || !dataEntrega || itens.length === 0) {
-      alert("Preencha o funcionário e adicione itens.");
-      return;
-    }
-    const novaEntrega = {
-      id: Date.now(),
-      funcionario: Number(funcionario),
-      dataEntrega,
-      assinatura: assinatura || "Manual",
-      itens,
-    };
-    setEntregas((prev) => [novaEntrega, ...prev]);
-    setModalAberto(false);
+    if (!funcionario || itens.length === 0) return;
+    const nova = { id: Date.now(), funcionario: Number(funcionario), dataEntrega, itens };
+    setEntregas((prev) => [nova, ...prev]); setModalAberto(false);
   }
-
-  const epiSelecionadoObj = mockEpis.find((e) => e.id === Number(epi));
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in">
 
-      {/* CABEÇALHO DA PÁGINA */}
+      {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">
-            📋 Histórico de Entregas
-          </h2>
-          <p className="text-sm text-gray-500">Registre a saída de materiais para os colaboradores.</p>
+          <h2 className="text-2xl font-bold text-gray-800">📋 Histórico e Relatórios</h2>
+          <p className="text-sm text-gray-500">Consulte, filtre e imprima relatórios de entrega.</p>
         </div>
-
-        <button
-          onClick={abrirModal}
-          className="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-800 transition flex items-center gap-2 shadow-sm"
-        >
+        <button onClick={abrirModal} className="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-800 transition shadow-sm flex items-center gap-2">
           <span>➕</span> Nova Entrega
         </button>
       </div>
 
-      {/* 4. BARRA DE BUSCA */}
-      <div className="relative mb-6">
-        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-          🔍
-        </span>
-        <input
-          type="text"
-          placeholder="Buscar por nome ou matrícula (Ex: 483920)..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-        />
+      {/* --- ÁREA DE FILTROS AVANÇADOS --- */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+        <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Filtros do Relatório</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            
+            {/* Filtro Nome */}
+            <div className="md:col-span-2">
+                <label className="text-xs text-gray-500 mb-1 block">Buscar Colaborador</label>
+                <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
+                    <input
+                        type="text"
+                        placeholder="Nome ou Matrícula..."
+                        value={busca}
+                        onChange={(e) => setBusca(e.target.value)}
+                        className="w-full pl-9 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label className="text-xs text-gray-500 mb-1 block">De (Data Inicial)</label>
+                <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
+            </div>
+
+            <div>
+                <label className="text-xs text-gray-500 mb-1 block">Até (Data Final)</label>
+                <input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
+            </div>
+        </div>
+
+        {/* Botões de Ação do Filtro */}
+        <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-200">
+            <span className="text-xs text-gray-500">
+                Mostrando <b>{entregasFiltradas.length}</b> registros
+            </span>
+            
+            <div className="flex gap-2">
+                {(busca || dataInicio || dataFim) && (
+                    <button 
+                        onClick={() => { setBusca(""); setDataInicio(""); setDataFim(""); }}
+                        className="text-xs text-red-500 font-bold hover:underline px-3"
+                    >
+                        Limpar Filtros
+                    </button>
+                )}
+                
+                {/* BOTÃO MÁGICO DE RELATÓRIO */}
+                <button 
+                    onClick={imprimirRelatorioGeral}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700 transition shadow-sm text-sm flex items-center gap-2"
+                >
+                    <span>🖨️</span> Gerar Relatório PDF
+                </button>
+            </div>
+        </div>
       </div>
 
-      {/* TABELA DE ENTREGAS REALIZADAS */}
+      {/* TABELA DE DADOS */}
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+          <thead className="bg-gray-100 text-gray-600 text-sm uppercase">
             <tr>
               <th className="p-4 font-semibold">Data</th>
               <th className="p-4 font-semibold">Colaborador</th>
               <th className="p-4 font-semibold">Itens Entregues</th>
-              <th className="p-4 font-semibold text-center">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 bg-white">
             {entregasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan="4" className="p-8 text-center text-gray-500">
-                  {busca ? "Nenhuma entrega encontrada para essa busca." : "Nenhuma entrega registrada."}
+                <td colSpan="3" className="p-8 text-center text-gray-500 italic">
+                  Nenhum registro encontrado para os filtros selecionados.
                 </td>
               </tr>
             ) : (
               entregasFiltradas.map((e) => {
                 const func = mockFuncionarios.find(f => f.id === e.funcionario);
-                const funcNome = func ? func.nome : "Desconhecido";
-                // Mostra a matrícula abaixo do nome
-                const funcMatricula = func ? func.matricula : "---";
-
                 return (
                   <tr key={e.id} className="hover:bg-gray-50 transition">
-                    <td className="p-4 text-gray-600 font-mono text-sm">
+                    <td className="p-4 text-gray-600 font-mono text-sm whitespace-nowrap">
                       {formatarData(e.dataEntrega)}
                     </td>
                     <td className="p-4">
-                      <div className="font-medium text-gray-800">{funcNome}</div>
-                      <div className="text-xs text-gray-500">Mat: {funcMatricula}</div>
+                      <div className="font-bold text-gray-800">{func?.nome || "Desconhecido"}</div>
+                      <div className="text-xs text-gray-500">Mat: {func?.matricula || "--"}</div>
                     </td>
-
                     <td className="p-4">
                       <div className="flex flex-wrap gap-2">
                         {e.itens.map((i) => {
-                          const epiNome = mockEpis.find(ep => ep.id === i.epi)?.nome;
+                          const epiNome = mockEpis.find(ep => ep.id === i.epi)?.nome || "Item";
                           return (
-                            <span key={i.id} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded border border-blue-100">
-                              {epiNome} ({i.tamanho}) <span className="font-bold">x{i.quantidade}</span>
+                            <span key={i.id} className="bg-blue-50 text-blue-800 text-xs px-2 py-1 rounded border border-blue-100">
+                              {epiNome} ({i.tamanho}) <b>x{i.quantidade}</b>
                             </span>
                           )
                         })}
                       </div>
-                    </td>
-
-                    <td className="p-4 text-center">
-                      <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                        CONCLUÍDO
-                      </span>
                     </td>
                   </tr>
                 );
@@ -209,82 +294,31 @@ function Entregas() {
         </table>
       </div>
 
-      {/* MODAL */}
       {modalAberto && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
-
-            <div className="bg-blue-50 px-6 py-4 border-b border-blue-100 flex justify-between items-center sticky top-0">
-              <h3 className="text-lg font-bold text-blue-800">👷 Nova Entrega</h3>
-              <button onClick={() => setModalAberto(false)} className="text-blue-400 hover:text-blue-600">✕</button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Colaborador</label>
-                  <select
-                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={funcionario}
-                    onChange={(e) => setFuncionario(e.target.value)}
-                  >
-                    <option value="">Selecione...</option>
-                    {mockFuncionarios.map((f) => (
-                      <option key={f.id} value={f.id}>{f.nome} (Mat: {f.matricula})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
-                  <input type="date" className="w-full p-2.5 border" value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
-                </div>
-              </div>
-
-              <hr className="border-gray-100" />
-
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">🛠️ Adicionar Itens</h4>
-                <div className="flex flex-col md:flex-row gap-3 items-end">
-                  <div className="flex-1 w-full">
-                    <label className="text-xs mb-1 block">EPI</label>
-                    <select className="w-full p-2 border rounded text-sm" value={epi} onChange={(e) => { setEpi(e.target.value); setTamanho(""); }}>
-                      <option value="">Selecione...</option>
-                      {mockEpis.map((e) => (<option key={e.id} value={e.id}>{e.nome}</option>))}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl">
+            <h3 className="font-bold text-xl mb-4 text-gray-800">Nova Entrega</h3>
+            <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                    <select className="w-full border p-2 rounded" value={funcionario} onChange={e => setFuncionario(e.target.value)}>
+                        <option value="">Colaborador...</option>
+                        {mockFuncionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                     </select>
-                  </div>
-                  <div className="w-full md:w-24">
-                    <label className="text-xs mb-1 block">Tam.</label>
-                    <select className="w-full p-2 border rounded text-sm" value={tamanho} onChange={(e) => setTamanho(e.target.value)} disabled={!epiSelecionadoObj}>
-                      <option value="">-</option>
-                      {epiSelecionadoObj?.tamanhos.map((t) => (<option key={t}>{t}</option>))}
-                    </select>
-                  </div>
-                  <div className="w-full md:w-20">
-                    <label className="text-xs mb-1 block">Qtd.</label>
-                    <input type="number" min="1" className="w-full p-2 border rounded text-sm" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
-                  </div>
-                  <button onClick={adicionarItem} className="px-4 py-2 bg-blue-700 text-white font-bold rounded text-sm">+ Add</button>
+                    <input type="date" className="w-full border p-2 rounded" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Itens ({itens.length})</label>
-                {itens.length > 0 && (
-                  <ul className="border rounded divide-y">
-                    {itens.map((i) => (
-                      <li key={i.id} className="p-2 flex justify-between items-center text-sm">
-                        <span>{mockEpis.find(e => e.id === i.epi)?.nome} ({i.tamanho}) - <b>{i.quantidade} un</b></span>
-                        <button onClick={() => removerItem(i.id)} className="text-red-500 font-bold">Remover</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t sticky bottom-0">
-                <button onClick={() => setModalAberto(false)} className="px-4 py-2 bg-gray-200 rounded text-gray-700">Cancelar</button>
-                <button onClick={salvarEntrega} className="px-6 py-2 bg-blue-700 text-white rounded font-bold">Salvar Entrega</button>
-              </div>
+                <div className="flex gap-2">
+                    <select className="border p-2 rounded flex-1" value={epi} onChange={e => setEpi(e.target.value)}>
+                        <option value="">EPI...</option>
+                        {mockEpis.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                    </select>
+                    <input type="number" placeholder="Qtd" className="border p-2 rounded w-20" value={quantidade} onChange={e => setQuantidade(e.target.value)} />
+                    <button onClick={adicionarItem} className="bg-blue-600 text-white px-3 rounded font-bold">+</button>
+                </div>
+                <div className="text-sm text-gray-500 bg-gray-50 p-2 rounded border">Itens na lista: {itens.length}</div>
+                <div className="flex justify-end gap-2 mt-4">
+                    <button onClick={() => setModalAberto(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
+                    <button onClick={salvarEntrega} className="px-4 py-2 bg-blue-700 text-white rounded font-bold hover:bg-blue-800">Salvar</button>
+                </div>
             </div>
           </div>
         </div>
