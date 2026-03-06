@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
+import ModalNovoEpi from "../components/modals/ModalNovoEpi";
 
 const SENHA_ADMINISTRACAO = "123";
 
@@ -19,6 +20,16 @@ const PERFIS = [
   { value: "admin", label: "Administrador", badge: "bg-red-100 text-red-700 border-red-200" },
   { value: "gerente", label: "Gerente", badge: "bg-violet-100 text-violet-700 border-violet-200" },
   { value: "colaborador", label: "Colaborador", badge: "bg-slate-100 text-slate-700 border-slate-200" },
+];
+
+const CATEGORIAS_EPI = [
+  { id: 1, nome: "Proteção da Cabeça (Capacetes/Toucas)" },
+  { id: 2, nome: "Proteção Auditiva (Protetores/Abafadores)" },
+  { id: 3, nome: "Proteção Respiratória (Máscaras/Filtros)" },
+  { id: 4, nome: "Proteção Visual (Óculos/Viseiras)" },
+  { id: 5, nome: "Proteção de Mãos (Luvas)" },
+  { id: 6, nome: "Proteção de Pés (Botinas/Sapatos)" },
+  { id: 7, nome: "Proteção contra Quedas (Cintos)" },
 ];
 
 const mockFuncionariosInicial = [
@@ -48,6 +59,27 @@ const mockFuncionariosInicial = [
   },
 ];
 
+const mockEpisInicial = [
+  {
+    id: 1,
+    nome: "Bota de Segurança",
+    categoria: 6,
+    fabricante: "Bracol",
+    ca: "15432",
+    quantidade: 48,
+    validade: "2027-12-31T00:00:00Z",
+  },
+  {
+    id: 2,
+    nome: "Óculos de Proteção Incolor",
+    categoria: 4,
+    fabricante: "3M",
+    ca: "10346",
+    quantidade: 120,
+    validade: "2028-06-30T00:00:00Z",
+  },
+];
+
 function gerarMatricula() {
   return Math.floor(1000000 + Math.random() * 9000000).toString();
 }
@@ -73,6 +105,23 @@ function getPerfilBadge(perfil) {
 
 function getPerfilLabel(perfil) {
   return PERFIS.find((p) => p.value === perfil)?.label || perfil;
+}
+
+function getCategoriaEpiLabel(categoria) {
+  if (!categoria) return "Sem categoria";
+
+  if (typeof categoria === "string") return categoria;
+  if (typeof categoria === "object" && categoria?.nome) return categoria.nome;
+
+  const id = Number(categoria?.id ?? categoria?.categoria_id ?? categoria);
+  return CATEGORIAS_EPI.find((c) => c.id === id)?.nome || "Sem categoria";
+}
+
+function formatarData(valor) {
+  if (!valor) return "-";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "-";
+  return data.toLocaleDateString("pt-BR");
 }
 
 function normalizarFuncionario(funcionario, listaDepartamentos, listaCargos) {
@@ -116,6 +165,18 @@ function normalizarFuncionario(funcionario, listaDepartamentos, listaCargos) {
   };
 }
 
+function normalizarEpi(produto) {
+  return {
+    id: produto?.id ?? Date.now() + Math.random(),
+    nome: produto?.nome ?? "",
+    categoriaLabel: getCategoriaEpiLabel(produto?.categoria ?? produto?.categoria_id ?? produto?.idCategoria),
+    fabricante: produto?.fabricante ?? produto?.marca ?? "-",
+    ca: produto?.ca ?? produto?.certificadoAprovacao ?? "-",
+    quantidade: Number(produto?.quantidade ?? produto?.estoque ?? 0),
+    validade: produto?.validade ?? null,
+  };
+}
+
 function Administracao() {
   const [acessoLiberado, setAcessoLiberado] = useState(false);
   const [senhaAcesso, setSenhaAcesso] = useState("");
@@ -126,6 +187,7 @@ function Administracao() {
   const [departamentos, setDepartamentos] = useState([]);
   const [cargos, setCargos] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
+  const [epis, setEpis] = useState([]);
 
   const [carregando, setCarregando] = useState(false);
   const [salvandoFuncionario, setSalvandoFuncionario] = useState(false);
@@ -135,8 +197,10 @@ function Administracao() {
   const [novoCargo, setNovoCargo] = useState({ nome: "", idDepto: "" });
 
   const [buscaFuncionario, setBuscaFuncionario] = useState("");
+  const [buscaEpi, setBuscaEpi] = useState("");
 
   const [modalFuncionarioAberto, setModalFuncionarioAberto] = useState(false);
+  const [modalEpiAberto, setModalEpiAberto] = useState(false);
   const [funcionarioEditando, setFuncionarioEditando] = useState(null);
 
   const [formFuncNome, setFormFuncNome] = useState("");
@@ -151,6 +215,7 @@ function Administracao() {
     let listaDepartamentos = mockDepartamentosInicial;
     let listaCargos = mockCargosInicial;
     let listaFuncionarios = mockFuncionariosInicial;
+    let listaEpis = mockEpisInicial;
 
     try {
       const resForn = await api.get("/fornecedores");
@@ -185,10 +250,19 @@ function Administracao() {
       );
     }
 
+    try {
+      const resEpis = await api.get("/produtos");
+      const dadosEpis = extrairLista(resEpis, mockEpisInicial);
+      listaEpis = dadosEpis.map((epi) => normalizarEpi(epi));
+    } catch (erro) {
+      listaEpis = mockEpisInicial.map((epi) => normalizarEpi(epi));
+    }
+
     setFornecedores(listaFornecedores);
     setDepartamentos(listaDepartamentos);
     setCargos(listaCargos);
     setFuncionarios(listaFuncionarios);
+    setEpis(listaEpis);
   };
 
   useEffect(() => {
@@ -361,6 +435,28 @@ function Administracao() {
     });
   }, [funcionarios, buscaFuncionario]);
 
+  const episFiltrados = useMemo(() => {
+    const termo = buscaEpi.trim().toLowerCase();
+
+    const lista = [...epis].sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+
+    if (!termo) return lista;
+
+    return lista.filter((epi) => {
+      const nome = (epi.nome || "").toLowerCase();
+      const fabricante = (epi.fabricante || "").toLowerCase();
+      const ca = String(epi.ca || "").toLowerCase();
+      const categoria = (epi.categoriaLabel || "").toLowerCase();
+
+      return (
+        nome.includes(termo) ||
+        fabricante.includes(termo) ||
+        ca.includes(termo) ||
+        categoria.includes(termo)
+      );
+    });
+  }, [epis, buscaEpi]);
+
   const salvarFuncionario = async () => {
     if (!formFuncNome || !formFuncMatricula || !formFuncDepartamento || !formFuncCargo || !formFuncPerfil) {
       alert("Preencha todos os campos obrigatórios.");
@@ -477,6 +573,11 @@ function Administracao() {
     }
   };
 
+  const aoSalvarEpi = async () => {
+    await carregarDadosAdm();
+    setAbaAtiva("epis");
+  };
+
   if (!acessoLiberado) {
     return (
       <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
@@ -587,6 +688,17 @@ function Administracao() {
             }`}
           >
             👥 Funcionários
+          </button>
+
+          <button
+            onClick={() => setAbaAtiva("epis")}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+              abaAtiva === "epis"
+                ? "bg-slate-800 text-white shadow-md"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            🦺 EPIs
           </button>
         </div>
 
@@ -959,6 +1071,108 @@ function Administracao() {
             </div>
           </div>
         )}
+
+        {abaAtiva === "epis" && (
+          <div className="animate-fade-in">
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
+              <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
+                <div className="w-full lg:max-w-md">
+                  <label className="text-xs text-slate-500 mb-1 block">Buscar EPI</label>
+                  <input
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
+                    value={buscaEpi}
+                    onChange={(e) => setBuscaEpi(e.target.value)}
+                    placeholder="Nome, categoria, fabricante ou CA"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="text-sm text-slate-500 flex items-center">
+                    Total: <b className="text-slate-800 ml-1">{episFiltrados.length}</b>
+                  </div>
+
+                  <button
+                    onClick={() => setModalEpiAberto(true)}
+                    className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition text-sm shadow-sm"
+                  >
+                    🦺 Cadastrar EPI
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden lg:block overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
+                  <tr>
+                    <th className="p-3">EPI</th>
+                    <th className="p-3">Categoria</th>
+                    <th className="p-3">Fabricante</th>
+                    <th className="p-3">CA</th>
+                    <th className="p-3">Quantidade</th>
+                    <th className="p-3">Validade</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {episFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-4 text-center text-gray-400 italic">
+                        Nenhum EPI encontrado.
+                      </td>
+                    </tr>
+                  ) : (
+                    episFiltrados.map((epi) => (
+                      <tr key={epi.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-medium text-slate-800">{epi.nome}</td>
+                        <td className="p-3 text-slate-600">{epi.categoriaLabel}</td>
+                        <td className="p-3 text-slate-600">{epi.fabricante || "-"}</td>
+                        <td className="p-3 text-slate-600 font-mono text-xs">{epi.ca || "-"}</td>
+                        <td className="p-3 text-slate-600">{epi.quantidade}</td>
+                        <td className="p-3 text-slate-600">{formatarData(epi.validade)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="lg:hidden space-y-4">
+              {episFiltrados.length === 0 ? (
+                <div className="p-4 text-center text-gray-400 italic border rounded-lg">
+                  Nenhum EPI encontrado.
+                </div>
+              ) : (
+                episFiltrados.map((epi) => (
+                  <div key={epi.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                    <div className="flex justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold text-slate-800">{epi.nome}</h3>
+                        <p className="text-xs text-slate-500 mt-1">{epi.categoriaLabel}</p>
+                      </div>
+
+                      <span className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 h-fit">
+                        Qtd: {epi.quantidade}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                      <div>
+                        <b>Fabricante:</b> {epi.fabricante || "-"}
+                      </div>
+                      <div>
+                        <b>CA:</b> {epi.ca || "-"}
+                      </div>
+                      <div>
+                        <b>Validade:</b> {formatarData(epi.validade)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {modalFuncionarioAberto && (
@@ -1096,6 +1310,13 @@ function Administracao() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalEpiAberto && (
+        <ModalNovoEpi
+          onClose={() => setModalEpiAberto(false)}
+          onSalvar={aoSalvarEpi}
+        />
       )}
     </>
   );
