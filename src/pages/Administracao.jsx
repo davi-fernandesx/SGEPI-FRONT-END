@@ -5,31 +5,32 @@ import ModalNovoEpi from "../components/modals/ModalNovoEpi";
 const SENHA_ADMINISTRACAO = "123";
 
 const mockDepartamentosInicial = [
-  { id: 1, nome: "Produção", cor: "bg-blue-100 text-blue-700 border-blue-200" },
-  { id: 2, nome: "Logística", cor: "bg-orange-100 text-orange-700 border-orange-200" },
-  { id: 3, nome: "Segurança do Trabalho", cor: "bg-green-100 text-green-700 border-green-200" },
+  { id: 1, nome: "Produção" },
+  { id: 2, nome: "Logística" },
+  { id: 3, nome: "Segurança do Trabalho" },
 ];
 
-const mockCargosInicial = [
-  { id: 1, nome: "Almoxarife", idDepto: 2 },
-  { id: 2, nome: "Técnico de Segurança", idDepto: 3 },
-  { id: 3, nome: "Operador de Máquinas", idDepto: 1 },
+const mockFuncoesInicial = [
+  { id: 1, nome: "Almoxarife", idDepartamento: 2 },
+  { id: 2, nome: "Técnico de Segurança", idDepartamento: 3 },
+  { id: 3, nome: "Operador de Máquinas", idDepartamento: 1 },
 ];
 
-const PERFIS = [
-  { value: "admin", label: "Administrador", badge: "bg-red-100 text-red-700 border-red-200" },
-  { value: "gerente", label: "Gerente", badge: "bg-violet-100 text-violet-700 border-violet-200" },
-  { value: "colaborador", label: "Colaborador", badge: "bg-slate-100 text-slate-700 border-slate-200" },
-];
-
-const CATEGORIAS_EPI = [
-  { id: 1, nome: "Proteção da Cabeça (Capacetes/Toucas)" },
-  { id: 2, nome: "Proteção Auditiva (Protetores/Abafadores)" },
-  { id: 3, nome: "Proteção Respiratória (Máscaras/Filtros)" },
-  { id: 4, nome: "Proteção Visual (Óculos/Viseiras)" },
-  { id: 5, nome: "Proteção de Mãos (Luvas)" },
-  { id: 6, nome: "Proteção de Pés (Botinas/Sapatos)" },
-  { id: 7, nome: "Proteção contra Quedas (Cintos)" },
+const mockFornecedoresInicial = [
+  {
+    id: 1,
+    razao_social: "3M do Brasil Ltda",
+    nome_fantasia: "3M",
+    cnpj: "45.985.371/0001-08",
+    inscricao_estadual: "123.456.789.000",
+  },
+  {
+    id: 2,
+    razao_social: "Bracol Calçados de Segurança Ltda",
+    nome_fantasia: "Bracol",
+    cnpj: "12.345.678/0001-90",
+    inscricao_estadual: "987.654.321.000",
+  },
 ];
 
 const mockFuncionariosInicial = [
@@ -37,46 +38,55 @@ const mockFuncionariosInicial = [
     id: 1,
     nome: "João Silva",
     matricula: "4839201",
-    departamento: mockDepartamentosInicial[0],
-    cargo: mockCargosInicial[2],
-    perfil: "colaborador",
+    idDepartamento: 1,
+    idFuncao: 3,
   },
   {
     id: 2,
     nome: "Maria Santos",
     matricula: "7391046",
-    departamento: mockDepartamentosInicial[2],
-    cargo: mockCargosInicial[1],
-    perfil: "gerente",
+    idDepartamento: 3,
+    idFuncao: 2,
   },
   {
     id: 3,
     nome: "Carlos Lima",
     matricula: "5827410",
-    departamento: mockDepartamentosInicial[1],
-    cargo: mockCargosInicial[0],
-    perfil: "colaborador",
+    idDepartamento: 2,
+    idFuncao: 1,
   },
+];
+
+const mockTiposProtecaoInicial = [
+  { id: 1, nome: "Proteção da Cabeça" },
+  { id: 2, nome: "Proteção Auditiva" },
+  { id: 3, nome: "Proteção Respiratória" },
+  { id: 4, nome: "Proteção Visual" },
+  { id: 5, nome: "Proteção de Mãos" },
+  { id: 6, nome: "Proteção de Pés" },
+  { id: 7, nome: "Proteção contra Quedas" },
 ];
 
 const mockEpisInicial = [
   {
     id: 1,
     nome: "Bota de Segurança",
-    categoria: 6,
     fabricante: "Bracol",
-    ca: "15432",
-    quantidade: 48,
-    validade: "2027-12-31T00:00:00Z",
+    CA: "15432",
+    descricao: "Bota ocupacional para uso industrial",
+    validade_CA: "2027-12-31T00:00:00Z",
+    idTipoProtecao: 6,
+    alerta_minimo: 10,
   },
   {
     id: 2,
     nome: "Óculos de Proteção Incolor",
-    categoria: 4,
     fabricante: "3M",
-    ca: "10346",
-    quantidade: 120,
-    validade: "2028-06-30T00:00:00Z",
+    CA: "10346",
+    descricao: "Proteção visual contra partículas",
+    validade_CA: "2028-06-30T00:00:00Z",
+    idTipoProtecao: 4,
+    alerta_minimo: 20,
   },
 ];
 
@@ -89,32 +99,103 @@ function extrairLista(resp, fallback = []) {
   return Array.isArray(dados) ? dados : fallback;
 }
 
-function getCargoDeptId(cargo) {
-  return Number(
-    cargo?.idDepto ??
-      cargo?.departamento_id ??
-      cargo?.departamentoId ??
-      cargo?.idDepartamento ??
-      0
-  );
+async function buscarPrimeiraLista(rotas, fallback = []) {
+  for (const rota of rotas) {
+    try {
+      const resp = await api.get(rota);
+      const lista = extrairLista(resp, fallback);
+      if (Array.isArray(lista)) return lista;
+    } catch (erro) {
+      // tenta próxima rota
+    }
+  }
+  return fallback;
 }
 
-function getPerfilBadge(perfil) {
-  return PERFIS.find((p) => p.value === perfil)?.badge || "bg-slate-100 text-slate-700 border-slate-200";
+function normalizarDepartamento(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    nome: item?.nome ?? "",
+  };
 }
 
-function getPerfilLabel(perfil) {
-  return PERFIS.find((p) => p.value === perfil)?.label || perfil;
+function normalizarFuncao(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    nome: item?.nome ?? "",
+    idDepartamento: Number(
+      item?.idDepartamento ??
+        item?.departamento_id ??
+        item?.departamentoId ??
+        item?.idDepto ??
+        item?.id_departamento ??
+        0
+    ),
+  };
 }
 
-function getCategoriaEpiLabel(categoria) {
-  if (!categoria) return "Sem categoria";
+function normalizarFornecedor(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    razao_social: item?.razao_social ?? item?.razaoSocial ?? "",
+    nome_fantasia: item?.nome_fantasia ?? item?.nomeFantasia ?? "",
+    cnpj: item?.cnpj ?? "",
+    inscricao_estadual:
+      item?.inscricao_estadual ?? item?.inscricaoEstadual ?? "",
+  };
+}
 
-  if (typeof categoria === "string") return categoria;
-  if (typeof categoria === "object" && categoria?.nome) return categoria.nome;
+function normalizarFuncionario(item) {
+  return {
+    id: Number(item?.id ?? Date.now()),
+    nome: item?.nome ?? "",
+    matricula: String(item?.matricula ?? ""),
+    idDepartamento: Number(
+      item?.idDepartamento ??
+        item?.departamento_id ??
+        item?.departamentoId ??
+        item?.id_departamento ??
+        item?.departamento?.id ??
+        0
+    ),
+    idFuncao: Number(
+      item?.idFuncao ??
+        item?.funcao_id ??
+        item?.funcaoId ??
+        item?.id_funcao ??
+        item?.cargo_id ??
+        item?.cargoId ??
+        item?.funcao?.id ??
+        item?.cargo?.id ??
+        0
+    ),
+  };
+}
 
-  const id = Number(categoria?.id ?? categoria?.categoria_id ?? categoria);
-  return CATEGORIAS_EPI.find((c) => c.id === id)?.nome || "Sem categoria";
+function normalizarTipoProtecao(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    nome: item?.nome ?? "",
+  };
+}
+
+function normalizarEpi(item) {
+  return {
+    id: Number(item?.id ?? Date.now()),
+    nome: item?.nome ?? "",
+    fabricante: item?.fabricante ?? "",
+    CA: item?.CA ?? item?.ca ?? "",
+    descricao: item?.descricao ?? "",
+    validade_CA: item?.validade_CA ?? item?.validadeCA ?? item?.validade_ca ?? null,
+    idTipoProtecao: Number(
+      item?.idTipoProtecao ??
+        item?.tipo_protecao_id ??
+        item?.tipoProtecaoId ??
+        item?.idTipo ??
+        0
+    ),
+    alerta_minimo: Number(item?.alerta_minimo ?? item?.alertaMinimo ?? 0),
+  };
 }
 
 function formatarData(valor) {
@@ -124,145 +205,81 @@ function formatarData(valor) {
   return data.toLocaleDateString("pt-BR");
 }
 
-function normalizarFuncionario(funcionario, listaDepartamentos, listaCargos) {
-  const deptId = Number(
-    funcionario?.departamento_id ??
-      funcionario?.departamentoId ??
-      funcionario?.idDepartamento ??
-      funcionario?.departamento?.id ??
-      0
-  );
-
-  const cargoId = Number(
-    funcionario?.cargo_id ??
-      funcionario?.cargoId ??
-      funcionario?.idCargo ??
-      funcionario?.funcao_id ??
-      funcionario?.funcaoId ??
-      funcionario?.cargo?.id ??
-      funcionario?.funcao?.id ??
-      0
-  );
-
-  const departamentoObj =
-    listaDepartamentos.find((d) => Number(d.id) === deptId) ||
-    funcionario?.departamento ||
-    null;
-
-  const cargoObj =
-    listaCargos.find((c) => Number(c.id) === cargoId) ||
-    funcionario?.cargo ||
-    funcionario?.funcao ||
-    null;
-
-  return {
-    id: funcionario?.id ?? Date.now(),
-    nome: funcionario?.nome ?? "",
-    matricula: String(funcionario?.matricula ?? gerarMatricula()),
-    departamento: departamentoObj,
-    cargo: cargoObj,
-    perfil: funcionario?.perfil || funcionario?.role || "colaborador",
-  };
-}
-
-function normalizarEpi(produto) {
-  return {
-    id: produto?.id ?? Date.now() + Math.random(),
-    nome: produto?.nome ?? "",
-    categoriaLabel: getCategoriaEpiLabel(produto?.categoria ?? produto?.categoria_id ?? produto?.idCategoria),
-    fabricante: produto?.fabricante ?? produto?.marca ?? "-",
-    ca: produto?.ca ?? produto?.certificadoAprovacao ?? "-",
-    quantidade: Number(produto?.quantidade ?? produto?.estoque ?? 0),
-    validade: produto?.validade ?? null,
-  };
-}
-
 function Administracao() {
   const [acessoLiberado, setAcessoLiberado] = useState(false);
   const [senhaAcesso, setSenhaAcesso] = useState("");
   const [erroSenha, setErroSenha] = useState("");
 
   const [abaAtiva, setAbaAtiva] = useState("fornecedores");
+
   const [fornecedores, setFornecedores] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
-  const [cargos, setCargos] = useState([]);
+  const [funcoes, setFuncoes] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
+  const [tiposProtecao, setTiposProtecao] = useState([]);
   const [epis, setEpis] = useState([]);
 
   const [carregando, setCarregando] = useState(false);
   const [salvandoFuncionario, setSalvandoFuncionario] = useState(false);
 
-  const [novoForn, setNovoForn] = useState({ nome: "", cnpj: "", contato: "" });
+  const [novoForn, setNovoForn] = useState({
+    razao_social: "",
+    nome_fantasia: "",
+    cnpj: "",
+    inscricao_estadual: "",
+  });
+
   const [novoDepto, setNovoDepto] = useState("");
-  const [novoCargo, setNovoCargo] = useState({ nome: "", idDepto: "" });
+  const [novaFuncao, setNovaFuncao] = useState({
+    nome: "",
+    idDepartamento: "",
+  });
 
   const [buscaFuncionario, setBuscaFuncionario] = useState("");
   const [buscaEpi, setBuscaEpi] = useState("");
 
   const [modalFuncionarioAberto, setModalFuncionarioAberto] = useState(false);
   const [modalEpiAberto, setModalEpiAberto] = useState(false);
+
   const [funcionarioEditando, setFuncionarioEditando] = useState(null);
 
   const [formFuncNome, setFormFuncNome] = useState("");
   const [formFuncMatricula, setFormFuncMatricula] = useState("");
   const [formFuncDepartamento, setFormFuncDepartamento] = useState("");
-  const [formFuncCargo, setFormFuncCargo] = useState("");
-  const [formFuncPerfil, setFormFuncPerfil] = useState("colaborador");
-  const [formFuncSenha, setFormFuncSenha] = useState("");
+  const [formFuncFuncao, setFormFuncFuncao] = useState("");
 
   const carregarDadosAdm = async () => {
-    let listaFornecedores = [];
-    let listaDepartamentos = mockDepartamentosInicial;
-    let listaCargos = mockCargosInicial;
-    let listaFuncionarios = mockFuncionariosInicial;
-    let listaEpis = mockEpisInicial;
+    setCarregando(true);
 
     try {
-      const resForn = await api.get("/fornecedores");
-      listaFornecedores = extrairLista(resForn, []);
-    } catch (erro) {
-      listaFornecedores = [];
-    }
+      const [
+        listaFornecedores,
+        listaDepartamentos,
+        listaFuncoes,
+        listaFuncionarios,
+        listaTiposProtecao,
+        listaEpis,
+      ] = await Promise.all([
+        buscarPrimeiraLista(["/fornecedores"], mockFornecedoresInicial),
+        buscarPrimeiraLista(["/departamentos"], mockDepartamentosInicial),
+        buscarPrimeiraLista(["/funcoes", "/cargos"], mockFuncoesInicial),
+        buscarPrimeiraLista(["/funcionarios"], mockFuncionariosInicial),
+        buscarPrimeiraLista(
+          ["/tipo-protecao", "/tipos-protecao", "/tipos_protecao"],
+          mockTiposProtecaoInicial
+        ),
+        buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpisInicial),
+      ]);
 
-    try {
-      const resDept = await api.get("/departamentos");
-      listaDepartamentos = extrairLista(resDept, mockDepartamentosInicial);
-    } catch (erro) {
-      listaDepartamentos = mockDepartamentosInicial;
+      setFornecedores(listaFornecedores.map(normalizarFornecedor));
+      setDepartamentos(listaDepartamentos.map(normalizarDepartamento));
+      setFuncoes(listaFuncoes.map(normalizarFuncao));
+      setFuncionarios(listaFuncionarios.map(normalizarFuncionario));
+      setTiposProtecao(listaTiposProtecao.map(normalizarTipoProtecao));
+      setEpis(listaEpis.map(normalizarEpi));
+    } finally {
+      setCarregando(false);
     }
-
-    try {
-      const resCargos = await api.get("/cargos");
-      listaCargos = extrairLista(resCargos, mockCargosInicial);
-    } catch (erro) {
-      listaCargos = mockCargosInicial;
-    }
-
-    try {
-      const resFuncionarios = await api.get("/funcionarios");
-      const dadosFuncionarios = extrairLista(resFuncionarios, mockFuncionariosInicial);
-      listaFuncionarios = dadosFuncionarios.map((f) =>
-        normalizarFuncionario(f, listaDepartamentos, listaCargos)
-      );
-    } catch (erro) {
-      listaFuncionarios = mockFuncionariosInicial.map((f) =>
-        normalizarFuncionario(f, listaDepartamentos, listaCargos)
-      );
-    }
-
-    try {
-      const resEpis = await api.get("/produtos");
-      const dadosEpis = extrairLista(resEpis, mockEpisInicial);
-      listaEpis = dadosEpis.map((epi) => normalizarEpi(epi));
-    } catch (erro) {
-      listaEpis = mockEpisInicial.map((epi) => normalizarEpi(epi));
-    }
-
-    setFornecedores(listaFornecedores);
-    setDepartamentos(listaDepartamentos);
-    setCargos(listaCargos);
-    setFuncionarios(listaFuncionarios);
-    setEpis(listaEpis);
   };
 
   useEffect(() => {
@@ -289,91 +306,230 @@ function Administracao() {
     }
   };
 
+  const getTipoProtecaoNome = (id) => {
+    return (
+      tiposProtecao.find((t) => Number(t.id) === Number(id))?.nome ||
+      "Sem tipo"
+    );
+  };
+
+  const getDepartamentoNome = (id) => {
+    return (
+      departamentos.find((d) => Number(d.id) === Number(id))?.nome || "-"
+    );
+  };
+
+  const funcoesDisponiveisForm = useMemo(() => {
+    return funcoes.filter(
+      (funcao) => Number(funcao.idDepartamento) === Number(formFuncDepartamento)
+    );
+  }, [funcoes, formFuncDepartamento]);
+
+  const funcionariosResolvidos = useMemo(() => {
+    return funcionarios.map((f) => ({
+      ...f,
+      departamento: departamentos.find(
+        (d) => Number(d.id) === Number(f.idDepartamento)
+      ),
+      funcao: funcoes.find((fn) => Number(fn.id) === Number(f.idFuncao)),
+    }));
+  }, [funcionarios, departamentos, funcoes]);
+
+  const funcionariosFiltrados = useMemo(() => {
+    const termo = buscaFuncionario.trim().toLowerCase();
+
+    const lista = [...funcionariosResolvidos].sort((a, b) =>
+      (a.nome || "").localeCompare(b.nome || "")
+    );
+
+    if (!termo) return lista;
+
+    return lista.filter((f) => {
+      const nome = (f.nome || "").toLowerCase();
+      const matricula = String(f.matricula || "");
+      const departamento = (f.departamento?.nome || "").toLowerCase();
+      const funcao = (f.funcao?.nome || "").toLowerCase();
+
+      return (
+        nome.includes(termo) ||
+        matricula.includes(termo) ||
+        departamento.includes(termo) ||
+        funcao.includes(termo)
+      );
+    });
+  }, [funcionariosResolvidos, buscaFuncionario]);
+
+  const episFiltrados = useMemo(() => {
+    const termo = buscaEpi.trim().toLowerCase();
+
+    const lista = [...epis]
+      .map((epi) => ({
+        ...epi,
+        tipoProtecaoNome: getTipoProtecaoNome(epi.idTipoProtecao),
+      }))
+      .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+
+    if (!termo) return lista;
+
+    return lista.filter((epi) => {
+      return (
+        (epi.nome || "").toLowerCase().includes(termo) ||
+        (epi.fabricante || "").toLowerCase().includes(termo) ||
+        String(epi.CA || "").toLowerCase().includes(termo) ||
+        (epi.descricao || "").toLowerCase().includes(termo) ||
+        (epi.tipoProtecaoNome || "").toLowerCase().includes(termo)
+      );
+    });
+  }, [epis, buscaEpi, tiposProtecao]);
+
   const adicionarFornecedor = async () => {
-    if (!novoForn.nome || !novoForn.cnpj) {
-      alert("Preencha Nome e CNPJ!");
+    if (!novoForn.razao_social || !novoForn.cnpj) {
+      alert("Preencha a razão social e o CNPJ.");
       return;
     }
 
     setCarregando(true);
 
+    const payload = {
+      razao_social: novoForn.razao_social,
+      nome_fantasia: novoForn.nome_fantasia,
+      cnpj: novoForn.cnpj,
+      inscricao_estadual: novoForn.inscricao_estadual,
+    };
+
     try {
-      await api.post("/fornecedor", novoForn);
-      const item = { id: Date.now(), ...novoForn };
-      setFornecedores((prev) => [item, ...prev]);
-      setNovoForn({ nome: "", cnpj: "", contato: "" });
+      await api.post("/fornecedor", payload);
     } catch (erro) {
-      const item = { id: Date.now(), ...novoForn };
-      setFornecedores((prev) => [item, ...prev]);
-      setNovoForn({ nome: "", cnpj: "", contato: "" });
-    } finally {
-      setCarregando(false);
+      try {
+        await api.post("/fornecedores", payload);
+      } catch (erro2) {
+        // fallback local
+      }
     }
+
+    const item = { id: Date.now(), ...payload };
+    setFornecedores((prev) => [item, ...prev]);
+    setNovoForn({
+      razao_social: "",
+      nome_fantasia: "",
+      cnpj: "",
+      inscricao_estadual: "",
+    });
+    setCarregando(false);
   };
 
   const adicionarDepartamento = async () => {
-    if (!novoDepto) {
-      alert("Digite o nome do departamento!");
+    if (!novoDepto.trim()) {
+      alert("Digite o nome do departamento.");
       return;
     }
 
     setCarregando(true);
 
-    const payload = {
-      nome: novoDepto,
-      cor: "bg-gray-100 text-gray-700 border-gray-200",
-    };
+    const payload = { nome: novoDepto.trim() };
 
     try {
       await api.post("/departamento", payload);
-      const item = { id: Date.now(), ...payload };
-      setDepartamentos((prev) => [item, ...prev]);
-      setNovoDepto("");
     } catch (erro) {
-      const item = { id: Date.now(), ...payload };
-      setDepartamentos((prev) => [item, ...prev]);
-      setNovoDepto("");
-    } finally {
-      setCarregando(false);
+      try {
+        await api.post("/departamentos", payload);
+      } catch (erro2) {
+        // fallback local
+      }
     }
+
+    const item = { id: Date.now(), ...payload };
+    setDepartamentos((prev) => [item, ...prev]);
+    setNovoDepto("");
+    setCarregando(false);
   };
 
-  const adicionarCargo = async () => {
-    if (!novoCargo.nome || !novoCargo.idDepto) {
-      alert("Preencha o nome e selecione o departamento!");
+  const adicionarFuncao = async () => {
+    if (!novaFuncao.nome || !novaFuncao.idDepartamento) {
+      alert("Preencha o nome da função e selecione o departamento.");
       return;
     }
 
     setCarregando(true);
 
     const payload = {
-      nome: novoCargo.nome,
-      idDepto: Number(novoCargo.idDepto),
+      nome: novaFuncao.nome.trim(),
+      idDepartamento: Number(novaFuncao.idDepartamento),
     };
 
     try {
-      await api.post("/cargo", payload);
-      const item = { id: Date.now(), ...payload };
-      setCargos((prev) => [item, ...prev]);
-      setNovoCargo({ nome: "", idDepto: "" });
+      await api.post("/funcao", payload);
     } catch (erro) {
-      const item = { id: Date.now(), ...payload };
-      setCargos((prev) => [item, ...prev]);
-      setNovoCargo({ nome: "", idDepto: "" });
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  const removerItem = async (id, setter, lista, endpoint) => {
-    if (window.confirm("Tem certeza que deseja excluir este item?")) {
       try {
-        await api.delete(`/${endpoint}/${id}`);
-        setter(lista.filter((item) => item.id !== id));
-      } catch (erro) {
-        setter(lista.filter((item) => item.id !== id));
+        await api.post("/funcoes", payload);
+      } catch (erro2) {
+        try {
+          await api.post("/cargo", payload);
+        } catch (erro3) {
+          // fallback local
+        }
       }
     }
+
+    const item = { id: Date.now(), ...payload };
+    setFuncoes((prev) => [item, ...prev]);
+    setNovaFuncao({ nome: "", idDepartamento: "" });
+    setCarregando(false);
+  };
+
+  const removerFornecedor = async (id) => {
+    if (!window.confirm("Tem certeza que deseja excluir este fornecedor?")) return;
+
+    try {
+      await api.delete(`/fornecedor/${id}`);
+    } catch (erro) {
+      try {
+        await api.delete(`/fornecedores/${id}`);
+      } catch (erro2) {
+        // fallback local
+      }
+    }
+
+    setFornecedores((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
+  };
+
+  const removerDepartamento = async (id) => {
+    if (!window.confirm("Tem certeza que deseja excluir este departamento?")) return;
+
+    try {
+      await api.delete(`/departamento/${id}`);
+    } catch (erro) {
+      try {
+        await api.delete(`/departamentos/${id}`);
+      } catch (erro2) {
+        // fallback local
+      }
+    }
+
+    setDepartamentos((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
+    setFuncoes((prev) =>
+      prev.filter((item) => Number(item.idDepartamento) !== Number(id))
+    );
+  };
+
+  const removerFuncao = async (id) => {
+    if (!window.confirm("Tem certeza que deseja excluir esta função?")) return;
+
+    try {
+      await api.delete(`/funcao/${id}`);
+    } catch (erro) {
+      try {
+        await api.delete(`/funcoes/${id}`);
+      } catch (erro2) {
+        try {
+          await api.delete(`/cargo/${id}`);
+        } catch (erro3) {
+          // fallback local
+        }
+      }
+    }
+
+    setFuncoes((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
   };
 
   const abrirModalNovoFuncionario = () => {
@@ -381,9 +537,7 @@ function Administracao() {
     setFormFuncNome("");
     setFormFuncMatricula(gerarMatricula());
     setFormFuncDepartamento("");
-    setFormFuncCargo("");
-    setFormFuncPerfil("colaborador");
-    setFormFuncSenha("");
+    setFormFuncFuncao("");
     setModalFuncionarioAberto(true);
   };
 
@@ -391,10 +545,8 @@ function Administracao() {
     setFuncionarioEditando(funcionario);
     setFormFuncNome(funcionario.nome || "");
     setFormFuncMatricula(String(funcionario.matricula || ""));
-    setFormFuncDepartamento(String(funcionario.departamento?.id || ""));
-    setFormFuncCargo(String(funcionario.cargo?.id || ""));
-    setFormFuncPerfil(funcionario.perfil || "colaborador");
-    setFormFuncSenha("");
+    setFormFuncDepartamento(String(funcionario.idDepartamento || ""));
+    setFormFuncFuncao(String(funcionario.idFuncao || ""));
     setModalFuncionarioAberto(true);
   };
 
@@ -404,75 +556,12 @@ function Administracao() {
     setFormFuncNome("");
     setFormFuncMatricula("");
     setFormFuncDepartamento("");
-    setFormFuncCargo("");
-    setFormFuncPerfil("colaborador");
-    setFormFuncSenha("");
+    setFormFuncFuncao("");
   };
 
-  const cargosDisponiveisForm = useMemo(() => {
-    return cargos.filter((cargo) => getCargoDeptId(cargo) === Number(formFuncDepartamento));
-  }, [cargos, formFuncDepartamento]);
-
-  const funcionariosFiltrados = useMemo(() => {
-    const termo = buscaFuncionario.trim().toLowerCase();
-
-    const lista = [...funcionarios].sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
-
-    if (!termo) return lista;
-
-    return lista.filter((f) => {
-      const nome = (f.nome || "").toLowerCase();
-      const matricula = String(f.matricula || "");
-      const departamento = (f.departamento?.nome || "").toLowerCase();
-      const cargo = (f.cargo?.nome || "").toLowerCase();
-
-      return (
-        nome.includes(termo) ||
-        matricula.includes(termo) ||
-        departamento.includes(termo) ||
-        cargo.includes(termo)
-      );
-    });
-  }, [funcionarios, buscaFuncionario]);
-
-  const episFiltrados = useMemo(() => {
-    const termo = buscaEpi.trim().toLowerCase();
-
-    const lista = [...epis].sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
-
-    if (!termo) return lista;
-
-    return lista.filter((epi) => {
-      const nome = (epi.nome || "").toLowerCase();
-      const fabricante = (epi.fabricante || "").toLowerCase();
-      const ca = String(epi.ca || "").toLowerCase();
-      const categoria = (epi.categoriaLabel || "").toLowerCase();
-
-      return (
-        nome.includes(termo) ||
-        fabricante.includes(termo) ||
-        ca.includes(termo) ||
-        categoria.includes(termo)
-      );
-    });
-  }, [epis, buscaEpi]);
-
   const salvarFuncionario = async () => {
-    if (!formFuncNome || !formFuncMatricula || !formFuncDepartamento || !formFuncCargo || !formFuncPerfil) {
+    if (!formFuncNome || !formFuncMatricula || !formFuncDepartamento || !formFuncFuncao) {
       alert("Preencha todos os campos obrigatórios.");
-      return;
-    }
-
-    if (!funcionarioEditando && (!formFuncSenha || formFuncSenha.trim().length < 4)) {
-      alert("Defina uma senha com pelo menos 4 caracteres.");
-      return;
-    }
-
-    const departamentoObj = departamentos.find((d) => Number(d.id) === Number(formFuncDepartamento));
-    const cargoObj = cargos.find((c) => Number(c.id) === Number(formFuncCargo));
-
-    if (!departamentoObj || !cargoObj) {
-      alert("Selecione um departamento e um cargo válidos.");
       return;
     }
 
@@ -481,85 +570,54 @@ function Administracao() {
     const payload = {
       nome: formFuncNome,
       matricula: formFuncMatricula,
-      departamento_id: Number(formFuncDepartamento),
-      cargo_id: Number(formFuncCargo),
-      perfil: formFuncPerfil,
-      senha: formFuncSenha || undefined,
+      idDepartamento: Number(formFuncDepartamento),
+      idFuncao: Number(formFuncFuncao),
     };
 
     if (funcionarioEditando) {
       try {
         await api.put(`/funcionario/${funcionarioEditando.id}`, payload);
-
-        setFuncionarios((prev) =>
-          prev.map((f) =>
-            f.id === funcionarioEditando.id
-              ? {
-                  ...f,
-                  nome: formFuncNome,
-                  matricula: formFuncMatricula,
-                  departamento: departamentoObj,
-                  cargo: cargoObj,
-                  perfil: formFuncPerfil,
-                }
-              : f
-          )
-        );
-
-        fecharModalFuncionario();
       } catch (erro) {
-        setFuncionarios((prev) =>
-          prev.map((f) =>
-            f.id === funcionarioEditando.id
-              ? {
-                  ...f,
-                  nome: formFuncNome,
-                  matricula: formFuncMatricula,
-                  departamento: departamentoObj,
-                  cargo: cargoObj,
-                  perfil: formFuncPerfil,
-                }
-              : f
-          )
-        );
-
-        fecharModalFuncionario();
-      } finally {
-        setSalvandoFuncionario(false);
+        try {
+          await api.put(`/funcionarios/${funcionarioEditando.id}`, payload);
+        } catch (erro2) {
+          // fallback local
+        }
       }
 
+      setFuncionarios((prev) =>
+        prev.map((f) =>
+          Number(f.id) === Number(funcionarioEditando.id)
+            ? {
+                ...f,
+                ...payload,
+              }
+            : f
+        )
+      );
+
+      fecharModalFuncionario();
+      setSalvandoFuncionario(false);
       return;
     }
 
     try {
       await api.post("/funcionario", payload);
-
-      const novoFuncionario = {
-        id: Date.now(),
-        nome: formFuncNome,
-        matricula: formFuncMatricula,
-        departamento: departamentoObj,
-        cargo: cargoObj,
-        perfil: formFuncPerfil,
-      };
-
-      setFuncionarios((prev) => [novoFuncionario, ...prev]);
-      fecharModalFuncionario();
     } catch (erro) {
-      const novoFuncionario = {
-        id: Date.now(),
-        nome: formFuncNome,
-        matricula: formFuncMatricula,
-        departamento: departamentoObj,
-        cargo: cargoObj,
-        perfil: formFuncPerfil,
-      };
-
-      setFuncionarios((prev) => [novoFuncionario, ...prev]);
-      fecharModalFuncionario();
-    } finally {
-      setSalvandoFuncionario(false);
+      try {
+        await api.post("/funcionarios", payload);
+      } catch (erro2) {
+        // fallback local
+      }
     }
+
+    setFuncionarios((prev) => [
+      { id: Date.now(), ...payload },
+      ...prev,
+    ]);
+
+    fecharModalFuncionario();
+    setSalvandoFuncionario(false);
   };
 
   const excluirFuncionario = async (id) => {
@@ -567,14 +625,20 @@ function Administracao() {
 
     try {
       await api.delete(`/funcionario/${id}`);
-      setFuncionarios((prev) => prev.filter((f) => f.id !== id));
     } catch (erro) {
-      setFuncionarios((prev) => prev.filter((f) => f.id !== id));
+      try {
+        await api.delete(`/funcionarios/${id}`);
+      } catch (erro2) {
+        // fallback local
+      }
     }
+
+    setFuncionarios((prev) => prev.filter((f) => Number(f.id) !== Number(id)));
   };
 
   const aoSalvarEpi = async () => {
     await carregarDadosAdm();
+    setModalEpiAberto(false);
     setAbaAtiva("epis");
   };
 
@@ -586,10 +650,15 @@ function Administracao() {
             <h2 className="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
               🔒 Área Administrativa
             </h2>
-            <p className="text-sm text-gray-500 mt-2">Digite a senha para acessar esta seção.</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Digite a senha para acessar esta seção.
+            </p>
           </div>
 
-          <form onSubmit={validarAcesso} className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+          <form
+            onSubmit={validarAcesso}
+            className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4"
+          >
             {erroSenha && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
                 {erroSenha}
@@ -597,7 +666,9 @@ function Administracao() {
             )}
 
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Senha de acesso</label>
+              <label className="text-xs text-slate-500 mb-1 block">
+                Senha de acesso
+              </label>
               <input
                 type="password"
                 value={senhaAcesso}
@@ -628,7 +699,7 @@ function Administracao() {
               ⚙️ Painel Administrativo
             </h2>
             <p className="text-sm text-gray-500">
-              Gerencie tabelas auxiliares e cadastros base do sistema.
+              Gerencie os cadastros base conforme a estrutura do banco.
             </p>
           </div>
 
@@ -669,14 +740,14 @@ function Administracao() {
           </button>
 
           <button
-            onClick={() => setAbaAtiva("cargos")}
+            onClick={() => setAbaAtiva("funcoes")}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-              abaAtiva === "cargos"
+              abaAtiva === "funcoes"
                 ? "bg-slate-800 text-white shadow-md"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            💼 Cargos & Funções
+            💼 Funções
           </button>
 
           <button
@@ -705,15 +776,42 @@ function Administracao() {
         {abaAtiva === "fornecedores" && (
           <div className="animate-fade-in">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Novo Fornecedor</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-500 mb-1 block">Razão Social / Nome</label>
+              <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">
+                Novo Fornecedor
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Razão Social
+                  </label>
                   <input
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
-                    value={novoForn.nome}
-                    onChange={(e) => setNovoForn({ ...novoForn, nome: e.target.value })}
+                    value={novoForn.razao_social}
+                    onChange={(e) =>
+                      setNovoForn((prev) => ({
+                        ...prev,
+                        razao_social: e.target.value,
+                      }))
+                    }
                     placeholder="Ex: Empresa X Ltda"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Nome Fantasia
+                  </label>
+                  <input
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
+                    value={novoForn.nome_fantasia}
+                    onChange={(e) =>
+                      setNovoForn((prev) => ({
+                        ...prev,
+                        nome_fantasia: e.target.value,
+                      }))
+                    }
+                    placeholder="Ex: Empresa X"
                   />
                 </div>
 
@@ -722,30 +820,42 @@ function Administracao() {
                   <input
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
                     value={novoForn.cnpj}
-                    onChange={(e) => setNovoForn({ ...novoForn, cnpj: e.target.value })}
+                    onChange={(e) =>
+                      setNovoForn((prev) => ({
+                        ...prev,
+                        cnpj: e.target.value,
+                      }))
+                    }
                     placeholder="00.000.000/0000-00"
                   />
                 </div>
 
                 <div>
-                  <button
-                    onClick={adicionarFornecedor}
-                    disabled={carregando}
-                    className="w-full bg-emerald-600 text-white font-bold py-2 rounded hover:bg-emerald-700 transition text-sm"
-                  >
-                    {carregando ? "..." : "+ Cadastrar"}
-                  </button>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Inscrição Estadual
+                  </label>
+                  <input
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
+                    value={novoForn.inscricao_estadual}
+                    onChange={(e) =>
+                      setNovoForn((prev) => ({
+                        ...prev,
+                        inscricao_estadual: e.target.value,
+                      }))
+                    }
+                    placeholder="Ex: 123.456.789.000"
+                  />
                 </div>
               </div>
 
-              <div className="mt-3">
-                <label className="text-xs text-slate-500 mb-1 block">Email / Contato</label>
-                <input
-                  className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
-                  value={novoForn.contato}
-                  onChange={(e) => setNovoForn({ ...novoForn, contato: e.target.value })}
-                  placeholder="contato@empresa.com"
-                />
+              <div className="mt-4">
+                <button
+                  onClick={adicionarFornecedor}
+                  disabled={carregando}
+                  className="w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-5 rounded hover:bg-emerald-700 transition text-sm"
+                >
+                  {carregando ? "..." : "+ Cadastrar"}
+                </button>
               </div>
             </div>
 
@@ -753,28 +863,39 @@ function Administracao() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
                   <tr>
-                    <th className="p-3">Empresa</th>
+                    <th className="p-3">Razão Social</th>
+                    <th className="p-3">Nome Fantasia</th>
                     <th className="p-3">CNPJ</th>
-                    <th className="p-3">Contato</th>
+                    <th className="p-3">Inscrição Estadual</th>
                     <th className="p-3 text-center">Ação</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-slate-100">
                   {fornecedores.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="p-4 text-center text-gray-400 italic">
-                        Nenhum fornecedor registado.
+                      <td colSpan="5" className="p-4 text-center text-gray-400 italic">
+                        Nenhum fornecedor registrado.
                       </td>
                     </tr>
                   ) : (
                     fornecedores.map((f) => (
                       <tr key={f.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-medium text-slate-800">{f.nome}</td>
-                        <td className="p-3 text-slate-500 font-mono text-xs">{f.cnpj}</td>
-                        <td className="p-3 text-slate-500">{f.contato}</td>
+                        <td className="p-3 font-medium text-slate-800">
+                          {f.razao_social || "-"}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {f.nome_fantasia || "-"}
+                        </td>
+                        <td className="p-3 text-slate-500 font-mono text-xs">
+                          {f.cnpj || "-"}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {f.inscricao_estadual || "-"}
+                        </td>
                         <td className="p-3 text-center">
                           <button
-                            onClick={() => removerItem(f.id, setFornecedores, fornecedores, "fornecedor")}
+                            onClick={() => removerFornecedor(f.id)}
                             className="text-red-500 hover:text-red-700 font-bold text-xs underline"
                           >
                             Excluir
@@ -793,7 +914,9 @@ function Administracao() {
           <div className="animate-fade-in">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 flex flex-col md:flex-row gap-3 items-end">
               <div className="flex-1 w-full">
-                <label className="text-xs text-slate-500 mb-1 block">Nome do Departamento</label>
+                <label className="text-xs text-slate-500 mb-1 block">
+                  Nome do Departamento
+                </label>
                 <input
                   className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
                   value={novoDepto}
@@ -817,9 +940,12 @@ function Administracao() {
                   key={d.id}
                   className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm hover:shadow-md transition"
                 >
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${d.cor}`}>{d.nome}</span>
+                  <span className="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {d.nome}
+                  </span>
+
                   <button
-                    onClick={() => removerItem(d.id, setDepartamentos, departamentos, "departamento")}
+                    onClick={() => removerDepartamento(d.id)}
                     className="text-gray-300 hover:text-red-500 transition"
                   >
                     ✕
@@ -830,17 +956,27 @@ function Administracao() {
           </div>
         )}
 
-        {abaAtiva === "cargos" && (
+        {abaAtiva === "funcoes" && (
           <div className="animate-fade-in">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Novo Cargo</h3>
+              <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">
+                Nova Função
+              </h3>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Departamento Vinculado</label>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Departamento Vinculado
+                  </label>
                   <select
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm bg-white"
-                    value={novoCargo.idDepto}
-                    onChange={(e) => setNovoCargo({ ...novoCargo, idDepto: e.target.value })}
+                    value={novaFuncao.idDepartamento}
+                    onChange={(e) =>
+                      setNovaFuncao((prev) => ({
+                        ...prev,
+                        idDepartamento: e.target.value,
+                      }))
+                    }
                   >
                     <option value="">Selecione...</option>
                     {departamentos.map((d) => (
@@ -852,22 +988,29 @@ function Administracao() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Nome do Cargo</label>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Nome da Função
+                  </label>
                   <input
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
-                    value={novoCargo.nome}
-                    onChange={(e) => setNovoCargo({ ...novoCargo, nome: e.target.value })}
+                    value={novaFuncao.nome}
+                    onChange={(e) =>
+                      setNovaFuncao((prev) => ({
+                        ...prev,
+                        nome: e.target.value,
+                      }))
+                    }
                     placeholder="Ex: Operador"
                   />
                 </div>
 
                 <div>
                   <button
-                    onClick={adicionarCargo}
+                    onClick={adicionarFuncao}
                     disabled={carregando}
                     className="w-full bg-emerald-600 text-white font-bold py-2 rounded hover:bg-emerald-700 transition text-sm"
                   >
-                    + Salvar Cargo
+                    + Salvar Função
                   </button>
                 </div>
               </div>
@@ -877,38 +1020,31 @@ function Administracao() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
                   <tr>
-                    <th className="p-3">Cargo</th>
+                    <th className="p-3">Função</th>
                     <th className="p-3">Departamento</th>
                     <th className="p-3 text-center">Ação</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {cargos.map((c) => {
-                    const dept = departamentos.find((d) => Number(d.id) === getCargoDeptId(c));
 
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-medium text-slate-800">{c.nome}</td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              dept?.cor || "bg-gray-100 text-gray-500"
-                            }`}
-                          >
-                            {dept?.nome || "Sem Depto"}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => removerItem(c.id, setCargos, cargos, "cargo")}
-                            className="text-red-500 hover:text-red-700 font-bold text-xs underline"
-                          >
-                            Excluir
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y divide-slate-100">
+                  {funcoes.map((f) => (
+                    <tr key={f.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-medium text-slate-800">{f.nome}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {getDepartamentoNome(f.idDepartamento)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => removerFuncao(f.id)}
+                          className="text-red-500 hover:text-red-700 font-bold text-xs underline"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -920,12 +1056,14 @@ function Administracao() {
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
               <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
                 <div className="w-full lg:max-w-md">
-                  <label className="text-xs text-slate-500 mb-1 block">Buscar funcionário</label>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Buscar funcionário
+                  </label>
                   <input
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
                     value={buscaFuncionario}
                     onChange={(e) => setBuscaFuncionario(e.target.value)}
-                    placeholder="Nome, matrícula, departamento ou cargo"
+                    placeholder="Nome, matrícula, departamento ou função"
                   />
                 </div>
 
@@ -951,8 +1089,7 @@ function Administracao() {
                     <th className="p-3">Matrícula</th>
                     <th className="p-3">Nome</th>
                     <th className="p-3">Departamento</th>
-                    <th className="p-3">Cargo</th>
-                    <th className="p-3">Perfil</th>
+                    <th className="p-3">Função</th>
                     <th className="p-3 text-center">Ações</th>
                   </tr>
                 </thead>
@@ -960,33 +1097,26 @@ function Administracao() {
                 <tbody className="divide-y divide-slate-100">
                   {funcionariosFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="p-4 text-center text-gray-400 italic">
+                      <td colSpan="5" className="p-4 text-center text-gray-400 italic">
                         Nenhum funcionário encontrado.
                       </td>
                     </tr>
                   ) : (
                     funcionariosFiltrados.map((f) => (
                       <tr key={f.id} className="hover:bg-slate-50">
-                        <td className="p-3 text-slate-500 font-mono text-xs">{f.matricula}</td>
-                        <td className="p-3 font-medium text-slate-800">{f.nome}</td>
+                        <td className="p-3 text-slate-500 font-mono text-xs">
+                          {f.matricula}
+                        </td>
+                        <td className="p-3 font-medium text-slate-800">
+                          {f.nome}
+                        </td>
                         <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              f.departamento?.cor || "bg-gray-100 text-gray-500"
-                            }`}
-                          >
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                             {f.departamento?.nome || "-"}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-600">{f.cargo?.nome || "-"}</td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getPerfilBadge(
-                              f.perfil
-                            )}`}
-                          >
-                            {getPerfilLabel(f.perfil)}
-                          </span>
+                        <td className="p-3 text-slate-600">
+                          {f.funcao?.nome || "-"}
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex justify-center gap-4">
@@ -1019,34 +1149,22 @@ function Administracao() {
               ) : (
                 funcionariosFiltrados.map((f) => (
                   <div key={f.id} className="border rounded-lg p-4 bg-white shadow-sm">
-                    <div className="flex justify-between gap-3">
-                      <div>
-                        <h3 className="font-bold text-slate-800">{f.nome}</h3>
-                        <p className="text-xs text-slate-500 font-mono mt-1">Mat: {f.matricula}</p>
-                      </div>
-
-                      <span
-                        className={`px-2 py-1 rounded text-[10px] font-bold border h-fit ${getPerfilBadge(
-                          f.perfil
-                        )}`}
-                      >
-                        {getPerfilLabel(f.perfil)}
-                      </span>
+                    <div>
+                      <h3 className="font-bold text-slate-800">{f.nome}</h3>
+                      <p className="text-xs text-slate-500 font-mono mt-1">
+                        Mat: {f.matricula}
+                      </p>
                     </div>
 
                     <div className="mt-3 space-y-2">
                       <div>
-                        <span
-                          className={`px-2 py-1 rounded text-[10px] font-bold ${
-                            f.departamento?.cor || "bg-gray-100 text-gray-500"
-                          }`}
-                        >
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {f.departamento?.nome || "-"}
                         </span>
                       </div>
 
                       <div className="text-sm text-slate-600">
-                        <b>Cargo:</b> {f.cargo?.nome || "-"}
+                        <b>Função:</b> {f.funcao?.nome || "-"}
                       </div>
                     </div>
 
@@ -1077,12 +1195,14 @@ function Administracao() {
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
               <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
                 <div className="w-full lg:max-w-md">
-                  <label className="text-xs text-slate-500 mb-1 block">Buscar EPI</label>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Buscar EPI
+                  </label>
                   <input
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-slate-500 outline-none text-sm"
                     value={buscaEpi}
                     onChange={(e) => setBuscaEpi(e.target.value)}
-                    placeholder="Nome, categoria, fabricante ou CA"
+                    placeholder="Nome, tipo, fabricante, CA ou descrição"
                   />
                 </div>
 
@@ -1106,11 +1226,11 @@ function Administracao() {
                 <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
                   <tr>
                     <th className="p-3">EPI</th>
-                    <th className="p-3">Categoria</th>
+                    <th className="p-3">Tipo de Proteção</th>
                     <th className="p-3">Fabricante</th>
                     <th className="p-3">CA</th>
-                    <th className="p-3">Quantidade</th>
-                    <th className="p-3">Validade</th>
+                    <th className="p-3">Alerta Mínimo</th>
+                    <th className="p-3">Validade do CA</th>
                   </tr>
                 </thead>
 
@@ -1124,12 +1244,27 @@ function Administracao() {
                   ) : (
                     episFiltrados.map((epi) => (
                       <tr key={epi.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-medium text-slate-800">{epi.nome}</td>
-                        <td className="p-3 text-slate-600">{epi.categoriaLabel}</td>
-                        <td className="p-3 text-slate-600">{epi.fabricante || "-"}</td>
-                        <td className="p-3 text-slate-600 font-mono text-xs">{epi.ca || "-"}</td>
-                        <td className="p-3 text-slate-600">{epi.quantidade}</td>
-                        <td className="p-3 text-slate-600">{formatarData(epi.validade)}</td>
+                        <td className="p-3">
+                          <div className="font-medium text-slate-800">{epi.nome}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            {epi.descricao || "Sem descrição"}
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {epi.tipoProtecaoNome}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {epi.fabricante || "-"}
+                        </td>
+                        <td className="p-3 text-slate-600 font-mono text-xs">
+                          {epi.CA || "-"}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {epi.alerta_minimo}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {formatarData(epi.validade_CA)}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1148,11 +1283,13 @@ function Administracao() {
                     <div className="flex justify-between gap-3">
                       <div>
                         <h3 className="font-bold text-slate-800">{epi.nome}</h3>
-                        <p className="text-xs text-slate-500 mt-1">{epi.categoriaLabel}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {epi.tipoProtecaoNome}
+                        </p>
                       </div>
 
                       <span className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 h-fit">
-                        Qtd: {epi.quantidade}
+                        CA: {epi.CA || "-"}
                       </span>
                     </div>
 
@@ -1161,10 +1298,13 @@ function Administracao() {
                         <b>Fabricante:</b> {epi.fabricante || "-"}
                       </div>
                       <div>
-                        <b>CA:</b> {epi.ca || "-"}
+                        <b>Alerta mínimo:</b> {epi.alerta_minimo}
                       </div>
                       <div>
-                        <b>Validade:</b> {formatarData(epi.validade)}
+                        <b>Validade do CA:</b> {formatarData(epi.validade_CA)}
+                      </div>
+                      <div>
+                        <b>Descrição:</b> {epi.descricao || "Sem descrição"}
                       </div>
                     </div>
                   </div>
@@ -1184,9 +1324,7 @@ function Administracao() {
                   {funcionarioEditando ? "✏️ Editar Funcionário" : "👥 Cadastrar Funcionário"}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  {funcionarioEditando
-                    ? "Atualize os dados do funcionário."
-                    : "Preencha os dados para cadastrar um novo funcionário."}
+                  Dados conforme a tabela funcionario.
                 </p>
               </div>
 
@@ -1220,28 +1358,13 @@ function Administracao() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">Perfil de acesso</label>
-                <select
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-sm bg-white"
-                  value={formFuncPerfil}
-                  onChange={(e) => setFormFuncPerfil(e.target.value)}
-                >
-                  {PERFIS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="text-xs text-slate-500 mb-1 block">Departamento</label>
                 <select
                   className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-sm bg-white"
                   value={formFuncDepartamento}
                   onChange={(e) => {
                     setFormFuncDepartamento(e.target.value);
-                    setFormFuncCargo("");
+                    setFormFuncFuncao("");
                   }}
                 >
                   <option value="">Selecione...</option>
@@ -1253,38 +1376,21 @@ function Administracao() {
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">Cargo / Função</label>
+              <div className="md:col-span-2">
+                <label className="text-xs text-slate-500 mb-1 block">Função</label>
                 <select
                   className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-sm bg-white disabled:bg-slate-50"
-                  value={formFuncCargo}
-                  onChange={(e) => setFormFuncCargo(e.target.value)}
+                  value={formFuncFuncao}
+                  onChange={(e) => setFormFuncFuncao(e.target.value)}
                   disabled={!formFuncDepartamento}
                 >
                   <option value="">Selecione...</option>
-                  {cargosDisponiveisForm.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
+                  {funcoesDisponiveisForm.map((fn) => (
+                    <option key={fn.id} value={fn.id}>
+                      {fn.nome}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="text-xs text-slate-500 mb-1 block">
-                  {funcionarioEditando ? "Nova senha (opcional)" : "Senha de acesso"}
-                </label>
-                <input
-                  type="password"
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-sm"
-                  value={formFuncSenha}
-                  onChange={(e) => setFormFuncSenha(e.target.value)}
-                  placeholder={
-                    funcionarioEditando
-                      ? "Deixe em branco para não alterar"
-                      : "Digite a senha do funcionário"
-                  }
-                />
               </div>
             </div>
 

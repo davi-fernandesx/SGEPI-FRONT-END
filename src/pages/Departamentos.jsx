@@ -1,45 +1,111 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { api } from "../services/api";
+
+const mockDepartamentosInicial = [
+  { id: 1, nome: "Logística" },
+  { id: 2, nome: "Estoque" },
+];
+
+const mockFuncoesInicial = [
+  { id: 101, nome: "Separador", idDepartamento: 1 },
+  { id: 102, nome: "Motorista", idDepartamento: 1 },
+  { id: 201, nome: "Estoquista", idDepartamento: 2 },
+];
+
+function extrairLista(resp, fallback = []) {
+  const dados = resp?.data ?? resp ?? fallback;
+  return Array.isArray(dados) ? dados : fallback;
+}
+
+function normalizarDepartamento(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    nome: item?.nome ?? "",
+  };
+}
+
+function normalizarFuncao(item) {
+  return {
+    id: Number(item?.id ?? 0),
+    nome: item?.nome ?? "",
+    idDepartamento: Number(
+      item?.idDepartamento ??
+        item?.departamento_id ??
+        item?.departamentoId ??
+        item?.id_departamento ??
+        0
+    ),
+  };
+}
 
 function Departamentos({ usuarioLogado }) {
-  const [departamentos, setDepartamentos] = useState([
-    {
-      id: 1,
-      nome: "Logística",
-      descricao: "Responsável por entregas e movimentação de estoque.",
-      funcoes: [
-        { id: 101, nome: "Separador", descricao: "Separação de pedidos." },
-        { id: 102, nome: "Motorista", descricao: "Entrega de mercadorias." },
-      ],
-    },
-    {
-      id: 2,
-      nome: "Estoque",
-      descricao: "Controle de entrada, saída e organização de produtos.",
-      funcoes: [
-        { id: 201, nome: "Estoquista", descricao: "Organização e conferência." },
-      ],
-    },
-  ]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [funcoes, setFuncoes] = useState([]);
 
   const [formDepartamento, setFormDepartamento] = useState({
     nome: "",
-    descricao: "",
   });
 
   const [formFuncao, setFormFuncao] = useState({
     departamentoId: "",
     nome: "",
-    descricao: "",
   });
+
+  const [carregandoDepartamento, setCarregandoDepartamento] = useState(false);
+  const [carregandoFuncao, setCarregandoFuncao] = useState(false);
 
   const perfilUsuario = usuarioLogado?.perfil || usuarioLogado?.role || "colaborador";
   const isAdmin = perfilUsuario === "admin";
 
-  const totalFuncoes = useMemo(() => {
-    return departamentos.reduce((acc, dep) => acc + dep.funcoes.length, 0);
-  }, [departamentos]);
+  const carregarDados = async () => {
+    let listaDepartamentos = mockDepartamentosInicial;
+    let listaFuncoes = mockFuncoesInicial;
 
-  function adicionarDepartamento(e) {
+    try {
+      const respDept = await api.get("/departamentos");
+      listaDepartamentos = extrairLista(respDept, mockDepartamentosInicial).map(
+        normalizarDepartamento
+      );
+    } catch (erro) {
+      listaDepartamentos = mockDepartamentosInicial.map(normalizarDepartamento);
+    }
+
+    try {
+      const respFuncoes = await api.get("/funcoes");
+      listaFuncoes = extrairLista(respFuncoes, mockFuncoesInicial).map(normalizarFuncao);
+    } catch (erro) {
+      try {
+        const respCargos = await api.get("/cargos");
+        listaFuncoes = extrairLista(respCargos, mockFuncoesInicial).map(normalizarFuncao);
+      } catch (erro2) {
+        listaFuncoes = mockFuncoesInicial.map(normalizarFuncao);
+      }
+    }
+
+    setDepartamentos(listaDepartamentos);
+    setFuncoes(listaFuncoes);
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const departamentosComFuncoes = useMemo(() => {
+    return [...departamentos]
+      .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""))
+      .map((dep) => ({
+        ...dep,
+        funcoes: [...funcoes]
+          .filter((funcao) => Number(funcao.idDepartamento) === Number(dep.id))
+          .sort((a, b) => (a.nome || "").localeCompare(b.nome || "")),
+      }));
+  }, [departamentos, funcoes]);
+
+  const totalFuncoes = useMemo(() => {
+    return funcoes.length;
+  }, [funcoes]);
+
+  async function adicionarDepartamento(e) {
     e.preventDefault();
 
     if (!isAdmin) {
@@ -48,7 +114,6 @@ function Departamentos({ usuarioLogado }) {
     }
 
     const nome = formDepartamento.nome.trim();
-    const descricao = formDepartamento.descricao.trim();
 
     if (!nome) {
       alert("Informe o nome do departamento.");
@@ -56,7 +121,7 @@ function Departamentos({ usuarioLogado }) {
     }
 
     const nomeJaExiste = departamentos.some(
-      (d) => d.nome.toLowerCase() === nome.toLowerCase()
+      (d) => (d.nome || "").toLowerCase() === nome.toLowerCase()
     );
 
     if (nomeJaExiste) {
@@ -64,23 +129,58 @@ function Departamentos({ usuarioLogado }) {
       return;
     }
 
-    const novoDepartamento = {
-      id: Date.now(),
-      nome,
-      descricao,
-      funcoes: [],
-    };
+    setCarregandoDepartamento(true);
 
-    setDepartamentos((prev) => [...prev, novoDepartamento]);
-    setFormDepartamento({ nome: "", descricao: "" });
+    const payload = { nome };
 
-    setFormFuncao((prev) => ({
-      ...prev,
-      departamentoId: prev.departamentoId || String(novoDepartamento.id),
-    }));
+    try {
+      await api.post("/departamento", payload);
+
+      const novoDepartamento = {
+        id: Date.now(),
+        nome,
+      };
+
+      setDepartamentos((prev) => [...prev, novoDepartamento]);
+      setFormDepartamento({ nome: "" });
+      setFormFuncao((prev) => ({
+        ...prev,
+        departamentoId: prev.departamentoId || String(novoDepartamento.id),
+      }));
+    } catch (erro) {
+      try {
+        await api.post("/departamentos", payload);
+
+        const novoDepartamento = {
+          id: Date.now(),
+          nome,
+        };
+
+        setDepartamentos((prev) => [...prev, novoDepartamento]);
+        setFormDepartamento({ nome: "" });
+        setFormFuncao((prev) => ({
+          ...prev,
+          departamentoId: prev.departamentoId || String(novoDepartamento.id),
+        }));
+      } catch (erro2) {
+        const novoDepartamento = {
+          id: Date.now(),
+          nome,
+        };
+
+        setDepartamentos((prev) => [...prev, novoDepartamento]);
+        setFormDepartamento({ nome: "" });
+        setFormFuncao((prev) => ({
+          ...prev,
+          departamentoId: prev.departamentoId || String(novoDepartamento.id),
+        }));
+      }
+    } finally {
+      setCarregandoDepartamento(false);
+    }
   }
 
-  function adicionarFuncao(e) {
+  async function adicionarFuncao(e) {
     e.preventDefault();
 
     if (!isAdmin) {
@@ -90,7 +190,6 @@ function Departamentos({ usuarioLogado }) {
 
     const departamentoId = Number(formFuncao.departamentoId);
     const nome = formFuncao.nome.trim();
-    const descricao = formFuncao.descricao.trim();
 
     if (!departamentoId) {
       alert("Selecione um departamento.");
@@ -102,85 +201,123 @@ function Departamentos({ usuarioLogado }) {
       return;
     }
 
-    let duplicada = false;
-
-    setDepartamentos((prev) =>
-      prev.map((dep) => {
-        if (dep.id !== departamentoId) return dep;
-
-        const funcaoDuplicada = dep.funcoes.some(
-          (f) => f.nome.toLowerCase() === nome.toLowerCase()
-        );
-
-        if (funcaoDuplicada) {
-          duplicada = true;
-          return dep;
-        }
-
-        return {
-          ...dep,
-          funcoes: [
-            ...dep.funcoes,
-            {
-              id: Date.now(),
-              nome,
-              descricao,
-            },
-          ],
-        };
-      })
+    const funcaoDuplicada = funcoes.some(
+      (f) =>
+        Number(f.idDepartamento) === departamentoId &&
+        (f.nome || "").toLowerCase() === nome.toLowerCase()
     );
 
-    if (duplicada) {
+    if (funcaoDuplicada) {
       alert("Essa função já existe nesse departamento.");
       return;
     }
 
-    setFormFuncao((prev) => ({
-      ...prev,
-      nome: "",
-      descricao: "",
-    }));
+    setCarregandoFuncao(true);
+
+    const payload = {
+      nome,
+      idDepartamento: departamentoId,
+    };
+
+    try {
+      await api.post("/funcao", payload);
+
+      const novaFuncao = {
+        id: Date.now(),
+        nome,
+        idDepartamento: departamentoId,
+      };
+
+      setFuncoes((prev) => [...prev, novaFuncao]);
+      setFormFuncao((prev) => ({
+        ...prev,
+        nome: "",
+      }));
+    } catch (erro) {
+      try {
+        await api.post("/funcoes", payload);
+
+        const novaFuncao = {
+          id: Date.now(),
+          nome,
+          idDepartamento: departamentoId,
+        };
+
+        setFuncoes((prev) => [...prev, novaFuncao]);
+        setFormFuncao((prev) => ({
+          ...prev,
+          nome: "",
+        }));
+      } catch (erro2) {
+        const novaFuncao = {
+          id: Date.now(),
+          nome,
+          idDepartamento: departamentoId,
+        };
+
+        setFuncoes((prev) => [...prev, novaFuncao]);
+        setFormFuncao((prev) => ({
+          ...prev,
+          nome: "",
+        }));
+      }
+    } finally {
+      setCarregandoFuncao(false);
+    }
   }
 
-  function excluirDepartamento(id) {
+  async function excluirDepartamento(id) {
     if (!isAdmin) {
       alert("Apenas administradores podem excluir departamentos.");
       return;
     }
 
     const confirmar = window.confirm(
-      "Tem certeza que deseja excluir este departamento e todas as funções dele?"
+      "Tem certeza que deseja excluir este departamento e todas as funções vinculadas a ele?"
     );
 
     if (!confirmar) return;
 
-    setDepartamentos((prev) => prev.filter((dep) => dep.id !== id));
+    try {
+      await api.delete(`/departamento/${id}`);
+    } catch (erro) {
+      try {
+        await api.delete(`/departamentos/${id}`);
+      } catch (erro2) {
+        // fallback local
+      }
+    }
+
+    setDepartamentos((prev) => prev.filter((dep) => Number(dep.id) !== Number(id)));
+    setFuncoes((prev) =>
+      prev.filter((funcao) => Number(funcao.idDepartamento) !== Number(id))
+    );
 
     setFormFuncao((prev) => {
-      if (Number(prev.departamentoId) === id) {
+      if (Number(prev.departamentoId) === Number(id)) {
         return { ...prev, departamentoId: "" };
       }
       return prev;
     });
   }
 
-  function excluirFuncao(departamentoId, funcaoId) {
+  async function excluirFuncao(funcaoId) {
     if (!isAdmin) {
       alert("Apenas administradores podem excluir funções.");
       return;
     }
 
-    setDepartamentos((prev) =>
-      prev.map((dep) => {
-        if (dep.id !== departamentoId) return dep;
+    try {
+      await api.delete(`/funcao/${funcaoId}`);
+    } catch (erro) {
+      try {
+        await api.delete(`/funcoes/${funcaoId}`);
+      } catch (erro2) {
+        // fallback local
+      }
+    }
 
-        return {
-          ...dep,
-          funcoes: dep.funcoes.filter((f) => f.id !== funcaoId),
-        };
-      })
-    );
+    setFuncoes((prev) => prev.filter((f) => Number(f.id) !== Number(funcaoId)));
   }
 
   return (
@@ -192,7 +329,7 @@ function Departamentos({ usuarioLogado }) {
               Departamentos
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Visualize os setores da empresa e as funções vinculadas a cada um.
+              Visualize os departamentos e as funções vinculadas a cada setor.
             </p>
           </div>
 
@@ -242,39 +379,23 @@ function Departamentos({ usuarioLogado }) {
                   type="text"
                   value={formDepartamento.nome}
                   onChange={(e) =>
-                    setFormDepartamento((prev) => ({
-                      ...prev,
+                    setFormDepartamento({
                       nome: e.target.value,
-                    }))
+                    })
                   }
                   placeholder="Ex.: Compras"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Descrição (opcional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={formDepartamento.descricao}
-                  onChange={(e) =>
-                    setFormDepartamento((prev) => ({
-                      ...prev,
-                      descricao: e.target.value,
-                    }))
-                  }
-                  placeholder="Descreva a responsabilidade do setor..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
-              </div>
-
               <button
                 type="submit"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition"
+                disabled={carregandoDepartamento}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition disabled:opacity-60"
               >
-                <span>Salvar departamento</span>
+                <span>
+                  {carregandoDepartamento ? "Salvando..." : "Salvar departamento"}
+                </span>
               </button>
             </form>
           </div>
@@ -300,7 +421,7 @@ function Departamentos({ usuarioLogado }) {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white"
                 >
                   <option value="">Selecione...</option>
-                  {departamentos.map((dep) => (
+                  {departamentosComFuncoes.map((dep) => (
                     <option key={dep.id} value={dep.id}>
                       {dep.nome}
                     </option>
@@ -326,29 +447,12 @@ function Departamentos({ usuarioLogado }) {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Descrição (opcional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={formFuncao.descricao}
-                  onChange={(e) =>
-                    setFormFuncao((prev) => ({
-                      ...prev,
-                      descricao: e.target.value,
-                    }))
-                  }
-                  placeholder="Descreva as atividades da função..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
-              </div>
-
               <button
                 type="submit"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium transition"
+                disabled={carregandoFuncao}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium transition disabled:opacity-60"
               >
-                <span>Salvar função</span>
+                <span>{carregandoFuncao ? "Salvando..." : "Salvar função"}</span>
               </button>
             </form>
           </div>
@@ -362,13 +466,13 @@ function Departamentos({ usuarioLogado }) {
           </h3>
         </div>
 
-        {departamentos.length === 0 ? (
+        {departamentosComFuncoes.length === 0 ? (
           <div className="border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500">
             Nenhum departamento cadastrado.
           </div>
         ) : (
           <div className="space-y-4">
-            {departamentos.map((dep) => (
+            {departamentosComFuncoes.map((dep) => (
               <div
                 key={dep.id}
                 className="border border-slate-200 rounded-xl p-4 md:p-5"
@@ -379,7 +483,7 @@ function Departamentos({ usuarioLogado }) {
                       {dep.nome}
                     </h4>
                     <p className="text-sm text-slate-500 mt-1">
-                      {dep.descricao || "Sem descrição."}
+                      Departamento cadastrado no sistema.
                     </p>
                   </div>
 
@@ -416,13 +520,13 @@ function Departamentos({ usuarioLogado }) {
                               {funcao.nome}
                             </p>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              {funcao.descricao || "Sem descrição."}
+                              Vinculada ao departamento {dep.nome}.
                             </p>
                           </div>
 
                           {isAdmin && (
                             <button
-                              onClick={() => excluirFuncao(dep.id, funcao.id)}
+                              onClick={() => excluirFuncao(funcao.id)}
                               className="self-start md:self-center text-xs px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition"
                             >
                               Excluir função
