@@ -4,21 +4,37 @@ import { api } from "../services/api";
 const mockFornecedores = [
   {
     id: 1,
-    nome: "3M do Brasil Ltda",
+    razao_social: "3M do Brasil Ltda",
+    nome_fantasia: "3M",
     cnpj: "45.985.371/0001-08",
-    contato: "vendas@3m.com",
-    telefone: "(19) 3838-7000",
-    cidade: "Sumaré - SP",
+    inscricao_estadual: "123.456.789.000",
   },
   {
     id: 2,
-    nome: "Bracol Calçados",
+    razao_social: "Bracol Calçados de Segurança Ltda",
+    nome_fantasia: "Bracol",
     cnpj: "12.345.678/0001-90",
-    contato: "comercial@bracol.com",
-    telefone: "(14) 3404-1000",
-    cidade: "Lins - SP",
+    inscricao_estadual: "987.654.321.000",
   },
 ];
+
+function extrairLista(resp, fallback = []) {
+  const dados = resp?.data ?? resp ?? fallback;
+  return Array.isArray(dados) ? dados : fallback;
+}
+
+function normalizarFornecedor(fornecedor) {
+  return {
+    id: fornecedor?.id ?? Date.now() + Math.random(),
+    razao_social: fornecedor?.razao_social ?? fornecedor?.razaoSocial ?? "",
+    nome_fantasia: fornecedor?.nome_fantasia ?? fornecedor?.nomeFantasia ?? "",
+    cnpj: fornecedor?.cnpj ?? "",
+    inscricao_estadual:
+      fornecedor?.inscricao_estadual ??
+      fornecedor?.inscricaoEstadual ??
+      "",
+  };
+}
 
 function Fornecedores() {
   const [fornecedores, setFornecedores] = useState([]);
@@ -29,17 +45,12 @@ function Fornecedores() {
 
   const carregarFornecedores = async () => {
     try {
-      const dados = await api.get("/fornecedores");
-      const lista = dados?.data ?? dados ?? [];
-
-      if (Array.isArray(lista)) {
-        setFornecedores(lista);
-      } else {
-        setFornecedores(mockFornecedores);
-      }
+      const resp = await api.get("/fornecedores");
+      const lista = extrairLista(resp, mockFornecedores).map(normalizarFornecedor);
+      setFornecedores(lista);
     } catch (erro) {
       console.log("Backend não tem a rota de fornecedores ainda. A usar dados falsos (mock).");
-      setFornecedores(mockFornecedores);
+      setFornecedores(mockFornecedores.map(normalizarFornecedor));
     }
   };
 
@@ -50,16 +61,26 @@ function Fornecedores() {
   const listaFiltrada = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
+    if (!termo) return fornecedores;
+
     return fornecedores.filter((f) => {
-      const nome = (f.nome || "").toLowerCase();
+      const razaoSocial = (f.razao_social || "").toLowerCase();
+      const nomeFantasia = (f.nome_fantasia || "").toLowerCase();
       const cnpj = String(f.cnpj || "");
-      return nome.includes(termo) || cnpj.includes(termo);
+      const inscricaoEstadual = String(f.inscricao_estadual || "").toLowerCase();
+
+      return (
+        razaoSocial.includes(termo) ||
+        nomeFantasia.includes(termo) ||
+        cnpj.includes(termo) ||
+        inscricaoEstadual.includes(termo)
+      );
     });
   }, [fornecedores, busca]);
 
   const listaOrdenada = useMemo(() => {
     return [...listaFiltrada].sort((a, b) =>
-      (a.nome || "").localeCompare(b.nome || "")
+      (a.razao_social || "").localeCompare(b.razao_social || "")
     );
   }, [listaFiltrada]);
 
@@ -83,7 +104,7 @@ function Fornecedores() {
             🏭 Fornecedores
           </h2>
           <p className="text-sm text-gray-500">
-            Visualize as empresas parceiras e emissoras de NF.
+            Visualize os fornecedores cadastrados no sistema.
           </p>
         </div>
       </div>
@@ -94,7 +115,7 @@ function Fornecedores() {
         </span>
         <input
           type="text"
-          placeholder="Buscar por Razão Social ou CNPJ..."
+          placeholder="Buscar por razão social, nome fantasia, CNPJ ou inscrição estadual..."
           value={busca}
           onChange={(e) => {
             setBusca(e.target.value);
@@ -108,29 +129,27 @@ function Fornecedores() {
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
             <tr>
-              <th className="p-4 font-semibold">Empresa</th>
+              <th className="p-4 font-semibold">Razão Social</th>
+              <th className="p-4 font-semibold">Nome Fantasia</th>
               <th className="p-4 font-semibold">CNPJ</th>
-              <th className="p-4 font-semibold">Contato / Email</th>
-              <th className="p-4 font-semibold">Telefone</th>
-              <th className="p-4 font-semibold">Cidade</th>
+              <th className="p-4 font-semibold">Inscrição Estadual</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-gray-200">
             {fornecedoresVisiveis.length === 0 ? (
               <tr>
-                <td colSpan="5" className="p-8 text-center text-gray-500">
+                <td colSpan="4" className="p-8 text-center text-gray-500">
                   Nenhum fornecedor encontrado.
                 </td>
               </tr>
             ) : (
               fornecedoresVisiveis.map((f) => (
                 <tr key={f.id} className="hover:bg-gray-50 transition">
-                  <td className="p-4 font-medium text-gray-800">{f.nome}</td>
-                  <td className="p-4 text-gray-600 font-mono text-xs">{f.cnpj}</td>
-                  <td className="p-4 text-gray-600 text-sm">{f.contato}</td>
-                  <td className="p-4 text-gray-600 text-sm">{f.telefone}</td>
-                  <td className="p-4 text-gray-600 text-sm">{f.cidade}</td>
+                  <td className="p-4 font-medium text-gray-800">{f.razao_social || "-"}</td>
+                  <td className="p-4 text-gray-600 text-sm">{f.nome_fantasia || "-"}</td>
+                  <td className="p-4 text-gray-600 font-mono text-xs">{f.cnpj || "-"}</td>
+                  <td className="p-4 text-gray-600 text-sm">{f.inscricao_estadual || "-"}</td>
                 </tr>
               ))
             )}
@@ -145,23 +164,25 @@ function Fornecedores() {
           </div>
         ) : (
           fornecedoresVisiveis.map((f) => (
-            <div key={f.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
+            <div
+              key={f.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative"
+            >
               <div className="mb-3">
-                <h3 className="font-bold text-gray-800 text-lg leading-tight">{f.nome}</h3>
-                <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 mt-1 inline-block">
-                  CNPJ: {f.cnpj}
+                <h3 className="font-bold text-gray-800 text-lg leading-tight">
+                  {f.razao_social || "-"}
+                </h3>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 mt-1 inline-block">
+                  Fantasia: {f.nome_fantasia || "-"}
                 </span>
               </div>
 
               <div className="space-y-2 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
-                  <span>📧</span> {f.contato}
+                  <span>🧾</span> CNPJ: {f.cnpj || "-"}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span>📞</span> {f.telefone}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>📍</span> {f.cidade}
+                  <span>🏷️</span> IE: {f.inscricao_estadual || "-"}
                 </div>
               </div>
             </div>

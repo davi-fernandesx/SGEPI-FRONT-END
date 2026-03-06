@@ -24,38 +24,138 @@ const mockFuncionariosInicial = [
     id: 1,
     nome: "João Silva",
     matricula: "4839201",
-    departamento: mockDepartamentos[0],
-    funcao: mockFuncoes[0],
+    idDepartamento: 1,
+    idFuncao: 1,
   },
   {
     id: 2,
     nome: "Maria Santos",
     matricula: "7391046",
-    departamento: mockDepartamentos[1],
-    funcao: mockFuncoes[3],
+    idDepartamento: 2,
+    idFuncao: 4,
   },
 ];
 
+function extrairLista(resp, fallback = []) {
+  const dados = resp?.data ?? resp ?? fallback;
+  return Array.isArray(dados) ? dados : fallback;
+}
+
+function normalizarDepartamento(departamento) {
+  return {
+    id: Number(departamento?.id ?? 0),
+    nome: departamento?.nome ?? "",
+    cor:
+      departamento?.cor ||
+      "bg-slate-100 text-slate-700 border-slate-200",
+  };
+}
+
+function normalizarFuncao(funcao) {
+  return {
+    id: Number(funcao?.id ?? 0),
+    nome: funcao?.nome ?? "",
+    idDepartamento: Number(
+      funcao?.idDepartamento ??
+        funcao?.departamento_id ??
+        funcao?.departamentoId ??
+        0
+    ),
+  };
+}
+
+function normalizarFuncionario(funcionario, listaDepartamentos, listaFuncoes) {
+  const idDepartamento = Number(
+    funcionario?.idDepartamento ??
+      funcionario?.departamento_id ??
+      funcionario?.departamentoId ??
+      funcionario?.departamento?.id ??
+      0
+  );
+
+  const idFuncao = Number(
+    funcionario?.idFuncao ??
+      funcionario?.funcao_id ??
+      funcionario?.funcaoId ??
+      funcionario?.cargo_id ??
+      funcionario?.cargoId ??
+      funcionario?.funcao?.id ??
+      funcionario?.cargo?.id ??
+      0
+  );
+
+  const departamentoObj =
+    listaDepartamentos.find((d) => Number(d.id) === idDepartamento) ||
+    (funcionario?.departamento
+      ? normalizarDepartamento(funcionario.departamento)
+      : null);
+
+  const funcaoObj =
+    listaFuncoes.find((f) => Number(f.id) === idFuncao) ||
+    (funcionario?.funcao
+      ? normalizarFuncao(funcionario.funcao)
+      : funcionario?.cargo
+      ? normalizarFuncao(funcionario.cargo)
+      : null);
+
+  return {
+    id: funcionario?.id ?? Date.now() + Math.random(),
+    nome: funcionario?.nome ?? "",
+    matricula: String(funcionario?.matricula ?? ""),
+    idDepartamento,
+    idFuncao,
+    departamento: departamentoObj,
+    funcao: funcaoObj,
+  };
+}
+
 function Funcionarios() {
   const [funcionarios, setFuncionarios] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [funcoes, setFuncoes] = useState([]);
   const [busca, setBusca] = useState("");
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const itensPorPagina = 5;
 
   const carregarFuncionarios = async () => {
-    try {
-      const resp = await api.get("/funcionarios");
-      const dados = resp?.data ?? resp ?? [];
+    let listaDepartamentos = mockDepartamentos.map(normalizarDepartamento);
+    let listaFuncoes = mockFuncoes.map(normalizarFuncao);
+    let listaFuncionarios = mockFuncionariosInicial;
 
-      if (Array.isArray(dados)) {
-        setFuncionarios(dados);
-      } else {
-        setFuncionarios(mockFuncionariosInicial);
-      }
+    try {
+      const respDept = await api.get("/departamentos");
+      listaDepartamentos = extrairLista(respDept, mockDepartamentos).map(normalizarDepartamento);
     } catch (erro) {
-      setFuncionarios(mockFuncionariosInicial);
+      listaDepartamentos = mockDepartamentos.map(normalizarDepartamento);
     }
+
+    try {
+      const respFuncoes = await api.get("/funcoes");
+      listaFuncoes = extrairLista(respFuncoes, mockFuncoes).map(normalizarFuncao);
+    } catch (erro) {
+      try {
+        const respCargos = await api.get("/cargos");
+        listaFuncoes = extrairLista(respCargos, mockFuncoes).map(normalizarFuncao);
+      } catch (erro2) {
+        listaFuncoes = mockFuncoes.map(normalizarFuncao);
+      }
+    }
+
+    try {
+      const respFuncionarios = await api.get("/funcionarios");
+      listaFuncionarios = extrairLista(respFuncionarios, mockFuncionariosInicial);
+    } catch (erro) {
+      listaFuncionarios = mockFuncionariosInicial;
+    }
+
+    setDepartamentos(listaDepartamentos);
+    setFuncoes(listaFuncoes);
+    setFuncionarios(
+      listaFuncionarios.map((funcionario) =>
+        normalizarFuncionario(funcionario, listaDepartamentos, listaFuncoes)
+      )
+    );
   };
 
   useEffect(() => {
@@ -70,7 +170,15 @@ function Funcionarios() {
     return funcionarios.filter((f) => {
       const nome = (f.nome || "").toLowerCase();
       const matricula = String(f.matricula || "");
-      return nome.includes(term) || matricula.includes(term);
+      const departamento = (f.departamento?.nome || "").toLowerCase();
+      const funcao = (f.funcao?.nome || "").toLowerCase();
+
+      return (
+        nome.includes(term) ||
+        matricula.includes(term) ||
+        departamento.includes(term) ||
+        funcao.includes(term)
+      );
     });
   }, [funcionarios, busca]);
 
@@ -175,7 +283,7 @@ function Funcionarios() {
           </span>
           <input
             type="text"
-            placeholder="Buscar por nome ou matrícula..."
+            placeholder="Buscar por nome, matrícula, departamento ou função..."
             value={busca}
             onChange={(e) => {
               setBusca(e.target.value);
@@ -198,63 +306,77 @@ function Funcionarios() {
           </thead>
 
           <tbody className="divide-y divide-gray-200">
-            {funcionariosVisiveis.map((func) => (
-              <tr key={func.id} className="hover:bg-gray-50 transition">
-                <td className="p-4 font-mono text-gray-600">{func.matricula}</td>
-                <td className="p-4 font-medium text-gray-800">{func.nome}</td>
-                <td className="p-4">
+            {funcionariosVisiveis.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="p-8 text-center text-gray-500">
+                  Nenhum funcionário encontrado.
+                </td>
+              </tr>
+            ) : (
+              funcionariosVisiveis.map((func) => (
+                <tr key={func.id} className="hover:bg-gray-50 transition">
+                  <td className="p-4 font-mono text-gray-600">{func.matricula || "-"}</td>
+                  <td className="p-4 font-medium text-gray-800">{func.nome || "-"}</td>
+                  <td className="p-4">
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-bold border ${
+                        func.departamento?.cor ||
+                        "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      {func.departamento?.nome || "-"}
+                    </span>
+                  </td>
+                  <td className="p-4 text-gray-600">{func.funcao?.nome || "-"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="lg:hidden space-y-4">
+        {funcionariosVisiveis.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            Nenhum funcionário encontrado.
+          </div>
+        ) : (
+          funcionariosVisiveis.map((func) => (
+            <div
+              key={func.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-bold text-gray-800 text-lg">{func.nome || "-"}</h3>
+                  <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                    Mat: {func.matricula || "-"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 mt-3">
+                <div>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-bold border ${
+                    className={`inline-block px-2 py-1 rounded text-[10px] font-bold border ${
                       func.departamento?.cor ||
                       "bg-slate-100 text-slate-700 border-slate-200"
                     }`}
                   >
                     {func.departamento?.nome || "-"}
                   </span>
-                </td>
-                <td className="p-4 text-gray-600">{func.funcao?.nome || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
 
-      <div className="lg:hidden space-y-4">
-        {funcionariosVisiveis.map((func) => (
-          <div
-            key={func.id}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="font-bold text-gray-800 text-lg">{func.nome}</h3>
-                <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                  Mat: {func.matricula}
-                </span>
+                <div className="text-sm text-gray-600 flex items-center gap-1">
+                  <span className="font-semibold text-gray-400 text-xs uppercase">
+                    Função:
+                  </span>
+                  {func.funcao?.nome || "-"}
+                </div>
               </div>
             </div>
-
-            <div className="space-y-2 mt-3">
-              <div>
-                <span
-                  className={`inline-block px-2 py-1 rounded text-[10px] font-bold border ${
-                    func.departamento?.cor ||
-                    "bg-slate-100 text-slate-700 border-slate-200"
-                  }`}
-                >
-                  {func.departamento?.nome || "-"}
-                </span>
-              </div>
-
-              <div className="text-sm text-gray-600 flex items-center gap-1">
-                <span className="font-semibold text-gray-400 text-xs uppercase">
-                  Cargo:
-                </span>
-                {func.funcao?.nome || "-"}
-              </div>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {totalPaginas > 1 && (
