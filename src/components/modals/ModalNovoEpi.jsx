@@ -1,7 +1,29 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../services/api";
 
-const tiposProtecaoDisponiveis = [
+const tamanhosPadrao = [
+  "PP",
+  "P",
+  "M",
+  "G",
+  "GG",
+  "XG",
+  "34",
+  "35",
+  "36",
+  "37",
+  "38",
+  "39",
+  "40",
+  "41",
+  "42",
+  "43",
+  "44",
+  "45",
+  "Único",
+];
+
+const mockTiposProtecao = [
   { id: 1, nome: "Proteção da Cabeça" },
   { id: 2, nome: "Proteção Auditiva" },
   { id: 3, nome: "Proteção Respiratória" },
@@ -11,204 +33,331 @@ const tiposProtecaoDisponiveis = [
   { id: 7, nome: "Proteção contra Quedas" },
 ];
 
-function ModalNovoEpi({ onClose, onSalvar }) {
-  const [nome, setNome] = useState("");
-  const [idTipoProtecao, setIdTipoProtecao] = useState("");
-  const [fabricante, setFabricante] = useState("");
-  const [ca, setCa] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [validadeCA, setValidadeCA] = useState("");
-  const [alertaMinimo, setAlertaMinimo] = useState("");
-  const [carregando, setCarregando] = useState(false);
+function extrairLista(resp, fallback = []) {
+  const dados = resp?.data ?? resp ?? fallback;
+  return Array.isArray(dados) ? dados : fallback;
+}
 
-  const salvarEpi = async () => {
-    if (!nome.trim() || !idTipoProtecao) {
-      alert("Preencha os campos obrigatórios.");
+async function buscarPrimeiraLista(rotas, fallback = []) {
+  for (const rota of rotas) {
+    try {
+      const resp = await api.get(rota);
+      const lista = extrairLista(resp, fallback);
+      if (Array.isArray(lista)) return lista;
+    } catch (erro) {
+      // tenta a próxima rota
+    }
+  }
+  return fallback;
+}
+
+function ModalNovoEpi({ onClose, onSalvar }) {
+  const [carregando, setCarregando] = useState(false);
+  const [tiposProtecao, setTiposProtecao] = useState([]);
+
+  const [form, setForm] = useState({
+    nome: "",
+    idTipoProtecao: "",
+    fabricante: "",
+    CA: "",
+    alerta_minimo: "",
+    descricao: "",
+    validade_CA: "",
+    tamanhos: [],
+  });
+
+  useEffect(() => {
+    async function carregarDados() {
+      const listaTipos = await buscarPrimeiraLista(
+        ["/tipo-protecao", "/tipos-protecao", "/tipos_protecao"],
+        mockTiposProtecao
+      );
+
+      setTiposProtecao(listaTipos);
+    }
+
+    carregarDados();
+  }, []);
+
+  const tamanhosSelecionadosTexto = useMemo(() => {
+    if (!form.tamanhos.length) return "Nenhum tamanho selecionado";
+    return form.tamanhos.join(", ");
+  }, [form.tamanhos]);
+
+  function atualizarCampo(campo, valor) {
+    setForm((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }));
+  }
+
+  function alternarTamanho(tamanho) {
+    setForm((prev) => {
+      const jaSelecionado = prev.tamanhos.includes(tamanho);
+
+      return {
+        ...prev,
+        tamanhos: jaSelecionado
+          ? prev.tamanhos.filter((item) => item !== tamanho)
+          : [...prev.tamanhos, tamanho],
+      };
+    });
+  }
+
+  function limparTamanhos() {
+    setForm((prev) => ({
+      ...prev,
+      tamanhos: [],
+    }));
+  }
+
+  async function salvarEpi() {
+    if (!form.nome.trim()) {
+      alert("Preencha o nome do EPI.");
       return;
     }
 
-    const novoEpi = {
-      nome: nome.trim(),
-      idTipoProtecao: Number(idTipoProtecao),
-      fabricante: fabricante.trim() || null,
-      CA: ca.trim() || null,
-      descricao: descricao.trim() || null,
-      validade_CA: validadeCA ? `${validadeCA}T00:00:00Z` : null,
-      alerta_minimo: alertaMinimo !== "" ? Number(alertaMinimo) : 0,
-    };
+    if (!form.idTipoProtecao) {
+      alert("Selecione o tipo de proteção.");
+      return;
+    }
 
     setCarregando(true);
 
+    const payload = {
+      nome: form.nome.trim(),
+      fabricante: form.fabricante.trim(),
+      CA: form.CA.trim(),
+      descricao: form.descricao.trim(),
+      validade_CA: form.validade_CA || null,
+      idTipoProtecao: Number(form.idTipoProtecao),
+      alerta_minimo: Number(form.alerta_minimo || 0),
+      tamanhos: form.tamanhos,
+    };
+
     try {
-      await api.post("/epi", novoEpi);
-      if (onSalvar) onSalvar();
-      onClose();
-    } catch (erro) {
       try {
-        await api.post("/epis", novoEpi);
-        if (onSalvar) onSalvar();
-        onClose();
-      } catch (erro2) {
-        alert("Não foi possível salvar o EPI no servidor.");
+        await api.post("/epi", payload);
+      } catch (erro) {
+        try {
+          await api.post("/epis", payload);
+        } catch (erro2) {
+          // fallback local
+        }
+      }
+
+      if (onSalvar) {
+        await onSalvar(payload);
       }
     } finally {
       setCarregando(false);
     }
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
-        <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="bg-slate-200 p-2 rounded-lg text-slate-700">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-            </span>
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in max-h-[95vh] flex flex-col">
+        <div className="px-6 py-5 border-b bg-slate-50 flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-700 text-2xl">
+              +
+            </div>
 
             <div>
-              <h2 className="text-xl font-bold text-slate-800">
+              <h3 className="text-[18px] md:text-[20px] font-bold text-slate-800">
                 Cadastrar Novo EPI
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Cadastro base conforme a tabela <b>epi</b>.
+              </h3>
+              <p className="text-sm text-slate-500">
+                Cadastro base conforme a tabela epi.
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-red-500 font-bold text-xl transition"
+            className="text-slate-400 hover:text-slate-600 text-4xl leading-none"
           >
-            ✕
+            ×
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6">
-          <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-              Identificação do EPI
-            </h3>
+        <div className="flex-1 overflow-y-auto px-6 py-8">
+          <div className="space-y-10">
+            <section>
+              <h4 className="text-sm font-extrabold tracking-wide text-slate-400 uppercase mb-5">
+                Identificação do EPI
+              </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome do EPI <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                  placeholder="Ex: Bota de Segurança"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Nome do EPI <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.nome}
+                    onChange={(e) => atualizarCampo("nome", e.target.value)}
+                    placeholder="Ex: Bota de Segurança"
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Tipo de Proteção <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={form.idTipoProtecao}
+                    onChange={(e) =>
+                      atualizarCampo("idTipoProtecao", e.target.value)
+                    }
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione...</option>
+                    {tiposProtecao.map((tipo) => (
+                      <option key={tipo.id} value={tipo.id}>
+                        {tipo.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Fabricante
+                  </label>
+                  <input
+                    type="text"
+                    value={form.fabricante}
+                    onChange={(e) =>
+                      atualizarCampo("fabricante", e.target.value)
+                    }
+                    placeholder="Ex: Bracol"
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    CA
+                  </label>
+                  <input
+                    type="text"
+                    value={form.CA}
+                    onChange={(e) => atualizarCampo("CA", e.target.value)}
+                    placeholder="Ex: 15432"
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Alerta mínimo
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.alerta_minimo}
+                    onChange={(e) =>
+                      atualizarCampo("alerta_minimo", e.target.value)
+                    }
+                    placeholder="Ex: 10"
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={form.descricao}
+                    onChange={(e) =>
+                      atualizarCampo("descricao", e.target.value)
+                    }
+                    placeholder="Descreva o EPI, finalidade ou observações importantes..."
+                    className="w-full min-h-[120px] p-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none resize-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                    <label className="block text-[15px] font-semibold text-slate-700">
+                      Tamanho ou tamanhos do EPI
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={limparTamanhos}
+                      className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 transition"
+                    >
+                      Limpar seleção
+                    </button>
+                  </div>
+
+                  <div className="border border-slate-300 rounded-xl p-4 bg-slate-50">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                      {tamanhosPadrao.map((tamanho) => {
+                        const ativo = form.tamanhos.includes(tamanho);
+
+                        return (
+                          <button
+                            key={tamanho}
+                            type="button"
+                            onClick={() => alternarTamanho(tamanho)}
+                            className={`h-11 rounded-xl border text-sm font-bold transition ${
+                              ativo
+                                ? "bg-blue-600 border-blue-600 text-white shadow-md"
+                                : "bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-600"
+                            }`}
+                          >
+                            {tamanho}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 p-3 rounded-xl bg-white border border-slate-200">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-400 block mb-1">
+                        Selecionados
+                      </span>
+                      <p className="text-sm text-slate-700">
+                        {tamanhosSelecionadosTexto}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Proteção <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
-                  value={idTipoProtecao}
-                  onChange={(e) => setIdTipoProtecao(e.target.value)}
-                >
-                  <option value="">Selecione...</option>
-                  {tiposProtecaoDisponiveis.map((tipo) => (
-                    <option key={tipo.id} value={tipo.id}>
-                      {tipo.nome}
-                    </option>
-                  ))}
-                </select>
+            <section>
+              <h4 className="text-sm font-extrabold tracking-wide text-slate-400 uppercase mb-5">
+                Controle do Certificado
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
+                    Validade do CA
+                  </label>
+                  <input
+                    type="date"
+                    value={form.validade_CA}
+                    onChange={(e) =>
+                      atualizarCampo("validade_CA", e.target.value)
+                    }
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fabricante
-                </label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                  placeholder="Ex: Bracol"
-                  value={fabricante}
-                  onChange={(e) => setFabricante(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CA
-                </label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                  placeholder="Ex: 15432"
-                  value={ca}
-                  onChange={(e) => setCa(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Alerta mínimo
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                  placeholder="Ex: 10"
-                  value={alertaMinimo}
-                  onChange={(e) => setAlertaMinimo(e.target.value)}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"
-                  placeholder="Descreva o EPI, finalidade ou observações importantes..."
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-              Controle do Certificado
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Validade do CA
-                </label>
-                <input
-                  type="date"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                  value={validadeCA}
-                  onChange={(e) => setValidadeCA(e.target.value)}
-                />
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Esta data será salva no campo <b>validade_CA</b>.
-                </p>
-              </div>
-            </div>
+            </section>
           </div>
         </div>
 
-        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t shrink-0">
+        <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-4">
           <button
             onClick={onClose}
-            disabled={carregando}
-            className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition"
+            className="px-4 py-3 text-slate-700 text-sm md:text-base font-semibold hover:text-slate-900 transition"
           >
             Cancelar
           </button>
@@ -216,12 +365,9 @@ function ModalNovoEpi({ onClose, onSalvar }) {
           <button
             onClick={salvarEpi}
             disabled={carregando}
-            className={`px-6 py-2 text-white font-bold rounded-lg shadow-md transition flex items-center gap-2 ${
-              carregando ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-            }`}
+            className="min-w-[190px] h-12 px-6 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition shadow-md disabled:opacity-60"
           >
-            <span>{carregando ? "⏳" : "💾"}</span>
-            {carregando ? "Salvando..." : "Salvar EPI"}
+            {carregando ? "Salvando..." : "💾 Salvar EPI"}
           </button>
         </div>
       </div>
