@@ -1,41 +1,73 @@
 const BASE_URL = "http://localhost:8080/api";
 
+async function tratarResposta(resposta, rota, mensagemErroPadrao) {
+  const contentType = resposta.headers.get("content-type");
+  let dados;
+
+  if (contentType && contentType.includes("application/json")) {
+    dados = await resposta.json();
+  } else {
+    dados = await resposta.text();
+  }
+
+  if (!resposta.ok) {
+    throw new Error(
+      typeof dados === "string" && dados
+        ? dados
+        : `${mensagemErroPadrao} ${rota}`
+    );
+  }
+
+  return dados;
+}
+
 export const api = {
-  // 1. GET (Ir buscar dados)
   get: async (rota) => {
     const resposta = await fetch(`${BASE_URL}${rota}`);
-    if (!resposta.ok) throw new Error(`Erro ao buscar dados de ${rota}`);
-    return await resposta.json();
+    return await tratarResposta(
+      resposta,
+      rota,
+      "Erro ao buscar dados de"
+    );
   },
 
-  // 2. POST (Enviar novos dados / Criar)
   post: async (rota, dados) => {
     const resposta = await fetch(`${BASE_URL}${rota}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    if (!resposta.ok) throw new Error(`Erro ao salvar dados em ${rota}`);
-    return await resposta.json();
+
+    return await tratarResposta(
+      resposta,
+      rota,
+      "Erro ao salvar dados em"
+    );
   },
 
-  // 3. PUT (Atualizar/Editar dados existentes)
   put: async (rota, dados) => {
     const resposta = await fetch(`${BASE_URL}${rota}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    if (!resposta.ok) throw new Error(`Erro ao atualizar dados em ${rota}`);
-    return await resposta.json();
+
+    return await tratarResposta(
+      resposta,
+      rota,
+      "Erro ao atualizar dados em"
+    );
   },
 
-  // 4. DELETE (Apagar dados)
   delete: async (rota) => {
     const resposta = await fetch(`${BASE_URL}${rota}`, {
       method: "DELETE",
     });
-    if (!resposta.ok) throw new Error(`Erro ao excluir dados em ${rota}`);
-    return resposta;
-  }
+
+    return await tratarResposta(
+      resposta,
+      rota,
+      "Erro ao excluir dados em"
+    );
+  },
 };
