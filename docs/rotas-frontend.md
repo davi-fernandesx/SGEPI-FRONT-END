@@ -11,7 +11,7 @@ O objetivo é centralizar quais endpoints cada tela utiliza, quais dados espera 
 
 O front-end utiliza a URL base definida em:
 
-```env
+env
 REACT_APP_API_URL=http://empresa.lvh.me:8080/api
 ````
 
