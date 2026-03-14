@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import Header from "./components/Header";
 import Dashboard from "./pages/Dashboard";
@@ -14,16 +14,46 @@ import Departamentos from "./pages/Departamentos";
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [paginaAtual, setPaginaAtual] = useState("Administracao");
+  const [carregandoSessao, setCarregandoSessao] = useState(true);
 
-  const handleLogin = (dadosUsuario) => {
-    setUsuario(dadosUsuario);
+  useEffect(() => {
+    try {
+      const usuarioSalvo = localStorage.getItem("usuario");
+      const tokenSalvo = localStorage.getItem("token");
+
+      if (usuarioSalvo && tokenSalvo) {
+        setUsuario(JSON.parse(usuarioSalvo));
+      }
+    } catch (error) {
+      console.error("Erro ao recuperar sessão:", error);
+      localStorage.removeItem("usuario");
+      localStorage.removeItem("token");
+    } finally {
+      setCarregandoSessao(false);
+    }
+  }, []);
+
+  const handleLogin = (dadosLogin) => {
+    const usuarioRecebido = dadosLogin?.usuario ?? dadosLogin;
+
+    setUsuario(usuarioRecebido);
     setPaginaAtual("Administracao");
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("usuario");
     setUsuario(null);
     setPaginaAtual("Administracao");
   };
+
+  if (carregandoSessao) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        Carregando...
+      </div>
+    );
+  }
 
   if (!usuario) {
     return <Login onLogin={handleLogin} />;
@@ -44,7 +74,7 @@ function App() {
       case "Funcionários":
         return <Funcionarios usuarioLogado={usuario} />;
       case "Departamentos":
-        return <Departamentos />;
+        return <Departamentos usuarioLogado={usuario} />;
       case "Fornecedores":
         return <Fornecedores />;
       case "Administracao":

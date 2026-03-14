@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
+import { temPermissao } from "../utils/permissoes";
+import ModalNovoEpi from "../components/modals/ModalNovoEpi";
 
 const SENHA_ADMINISTRACAO = "123";
 
@@ -103,29 +105,6 @@ const mockEpisInicial = [
   },
 ];
 
-const tamanhosPadrao = [
-  "PP",
-  "P",
-  "M",
-  "G",
-  "GG",
-  "XG",
-  "34",
-  "35",
-  "36",
-  "37",
-  "38",
-  "39",
-  "40",
-  "41",
-  "42",
-  "43",
-  "44",
-  "45",
-  "46",
-  "Único",
-];
-
 function gerarMatricula() {
   return Math.floor(1000000 + Math.random() * 9000000).toString();
 }
@@ -146,6 +125,39 @@ async function buscarPrimeiraLista(rotas, fallback = []) {
     }
   }
   return fallback;
+}
+
+async function tentarPost(rotas, payload) {
+  for (const rota of rotas) {
+    try {
+      return await api.post(rota, payload);
+    } catch (erro) {
+      // tenta a próxima rota
+    }
+  }
+  return null;
+}
+
+async function tentarPut(rotas, payload) {
+  for (const rota of rotas) {
+    try {
+      return await api.put(rota, payload);
+    } catch (erro) {
+      // tenta a próxima rota
+    }
+  }
+  return null;
+}
+
+async function tentarDelete(rotas) {
+  for (const rota of rotas) {
+    try {
+      return await api.delete(rota);
+    } catch (erro) {
+      // tenta a próxima rota
+    }
+  }
+  return null;
 }
 
 function normalizarDepartamento(item) {
@@ -274,332 +286,7 @@ function formatarTamanhos(tamanhos) {
   return tamanhos.join(", ");
 }
 
-function ModalNovoEpi({ onClose, onSalvar, tiposProtecao, fornecedores }) {
-  const [salvando, setSalvando] = useState(false);
-
-  const [form, setForm] = useState({
-    nome: "",
-    idTipoProtecao: "",
-    fabricante: "",
-    CA: "",
-    alerta_minimo: "",
-    descricao: "",
-    validade_CA: "",
-    tamanhos: [],
-  });
-
-  const fornecedoresSugestoes = useMemo(() => {
-    return fornecedores
-      .map((f) => f.nome_fantasia || f.razao_social)
-      .filter(Boolean);
-  }, [fornecedores]);
-
-  const tamanhosSelecionadosTexto = useMemo(() => {
-    if (!form.tamanhos.length) return "Nenhum tamanho selecionado";
-    return form.tamanhos.join(", ");
-  }, [form.tamanhos]);
-
-  function atualizarCampo(campo, valor) {
-    setForm((prev) => ({
-      ...prev,
-      [campo]: valor,
-    }));
-  }
-
-  function alternarTamanho(tamanho) {
-    setForm((prev) => {
-      const ativo = prev.tamanhos.includes(tamanho);
-
-      return {
-        ...prev,
-        tamanhos: ativo
-          ? prev.tamanhos.filter((item) => item !== tamanho)
-          : [...prev.tamanhos, tamanho],
-      };
-    });
-  }
-
-  function limparTamanhos() {
-    setForm((prev) => ({
-      ...prev,
-      tamanhos: [],
-    }));
-  }
-
-  async function salvarEpi() {
-    if (!form.nome.trim()) {
-      alert("Preencha o nome do EPI.");
-      return;
-    }
-
-    if (!form.idTipoProtecao) {
-      alert("Selecione o tipo de proteção.");
-      return;
-    }
-
-    setSalvando(true);
-
-    const payload = {
-      nome: form.nome.trim(),
-      fabricante: form.fabricante.trim(),
-      CA: form.CA.trim(),
-      descricao: form.descricao.trim(),
-      validade_CA: form.validade_CA || null,
-      idTipoProtecao: Number(form.idTipoProtecao),
-      alerta_minimo: Number(form.alerta_minimo || 0),
-      tamanhos: form.tamanhos,
-      tamanhos_disponiveis: form.tamanhos,
-    };
-
-    try {
-      try {
-        await api.post("/epi", payload);
-      } catch (erro) {
-        try {
-          await api.post("/epis", payload);
-        } catch (erro2) {
-          try {
-            await api.post("/produtos", payload);
-          } catch (erro3) {
-            // fallback local
-          }
-        }
-      }
-
-      await onSalvar(payload);
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in max-h-[95vh] flex flex-col">
-        <div className="px-6 py-5 border-b bg-slate-50 flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-700 text-2xl">
-              +
-            </div>
-
-            <div>
-              <h3 className="text-[18px] md:text-[20px] font-bold text-slate-800">
-                Cadastrar Novo EPI
-              </h3>
-              <p className="text-sm text-slate-500">
-                Cadastro base conforme a tabela epi.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-4xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-8">
-          <div className="space-y-10">
-            <section>
-              <h4 className="text-sm font-extrabold tracking-wide text-slate-400 uppercase mb-5">
-                Identificação do EPI
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Nome do EPI <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.nome}
-                    onChange={(e) => atualizarCampo("nome", e.target.value)}
-                    placeholder="Ex: Bota de Segurança"
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Tipo de Proteção <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={form.idTipoProtecao}
-                    onChange={(e) =>
-                      atualizarCampo("idTipoProtecao", e.target.value)
-                    }
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione...</option>
-                    {tiposProtecao.map((tipo) => (
-                      <option key={tipo.id} value={tipo.id}>
-                        {tipo.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Fabricante
-                  </label>
-                  <input
-                    type="text"
-                    list="lista-fornecedores-epi"
-                    value={form.fabricante}
-                    onChange={(e) =>
-                      atualizarCampo("fabricante", e.target.value)
-                    }
-                    placeholder="Ex: Bracol"
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <datalist id="lista-fornecedores-epi">
-                    {fornecedoresSugestoes.map((fornecedor) => (
-                      <option key={fornecedor} value={fornecedor} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    CA
-                  </label>
-                  <input
-                    type="text"
-                    value={form.CA}
-                    onChange={(e) => atualizarCampo("CA", e.target.value)}
-                    placeholder="Ex: 15432"
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Alerta mínimo
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.alerta_minimo}
-                    onChange={(e) =>
-                      atualizarCampo("alerta_minimo", e.target.value)
-                    }
-                    placeholder="Ex: 10"
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Descrição
-                  </label>
-                  <textarea
-                    value={form.descricao}
-                    onChange={(e) =>
-                      atualizarCampo("descricao", e.target.value)
-                    }
-                    placeholder="Descreva o EPI, finalidade ou observações importantes..."
-                    className="w-full min-h-[120px] p-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none resize-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                    <label className="block text-[15px] font-semibold text-slate-700">
-                      Tamanho ou tamanhos do EPI
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={limparTamanhos}
-                      className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 transition"
-                    >
-                      Limpar seleção
-                    </button>
-                  </div>
-
-                  <div className="border border-slate-300 rounded-xl p-4 bg-slate-50">
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                      {tamanhosPadrao.map((tamanho) => {
-                        const ativo = form.tamanhos.includes(tamanho);
-
-                        return (
-                          <button
-                            key={tamanho}
-                            type="button"
-                            onClick={() => alternarTamanho(tamanho)}
-                            className={`h-11 rounded-xl border text-sm font-bold transition ${
-                              ativo
-                                ? "bg-blue-600 border-blue-600 text-white shadow-md"
-                                : "bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-600"
-                            }`}
-                          >
-                            {tamanho}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mt-4 p-3 rounded-xl bg-white border border-slate-200">
-                      <span className="text-xs font-bold uppercase tracking-wide text-slate-400 block mb-1">
-                        Selecionados
-                      </span>
-                      <p className="text-sm text-slate-700">
-                        {tamanhosSelecionadosTexto}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h4 className="text-sm font-extrabold tracking-wide text-slate-400 uppercase mb-5">
-                Controle do Certificado
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[15px] font-semibold text-slate-700 mb-2">
-                    Validade do CA
-                  </label>
-                  <input
-                    type="date"
-                    value={form.validade_CA}
-                    onChange={(e) =>
-                      atualizarCampo("validade_CA", e.target.value)
-                    }
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-3 text-slate-700 text-sm md:text-base font-semibold hover:text-slate-900 transition"
-          >
-            Cancelar
-          </button>
-
-          <button
-            onClick={salvarEpi}
-            disabled={salvando}
-            className="min-w-[190px] h-12 px-6 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition shadow-md disabled:opacity-60"
-          >
-            {salvando ? "Salvando..." : "💾 Salvar EPI"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Administracao() {
+function Administracao({ usuarioLogado }) {
   const [acessoLiberado, setAcessoLiberado] = useState(false);
   const [senhaAcesso, setSenhaAcesso] = useState("");
   const [erroSenha, setErroSenha] = useState("");
@@ -652,6 +339,15 @@ function Administracao() {
   const [formFuncDepartamento, setFormFuncDepartamento] = useState("");
   const [formFuncFuncao, setFormFuncFuncao] = useState("");
 
+  const adminPorPerfil =
+    usuarioLogado?.perfil === "admin" || usuarioLogado?.role === "admin";
+
+  const adminPorPermissao = usuarioLogado
+    ? temPermissao(usuarioLogado, "visualizar_fornecedores")
+    : false;
+
+  const podeAcessarPainel = adminPorPerfil || adminPorPermissao || acessoLiberado;
+
   const carregarDadosAdm = async () => {
     setCarregando(true);
 
@@ -693,10 +389,10 @@ function Administracao() {
   };
 
   useEffect(() => {
-    if (acessoLiberado) {
+    if (podeAcessarPainel) {
       carregarDadosAdm();
     }
-  }, [acessoLiberado]);
+  }, [podeAcessarPainel]);
 
   const validarAcesso = (e) => {
     e.preventDefault();
@@ -717,23 +413,40 @@ function Administracao() {
   };
 
   const getTipoProtecaoNome = (id) => {
-    return (
-      tiposProtecao.find((t) => Number(t.id) === Number(id))?.nome ||
-      "Sem tipo"
-    );
+    return tiposProtecao.find((t) => Number(t.id) === Number(id))?.nome || "Sem tipo";
   };
 
   const getDepartamentoNome = (id) => {
-    return (
-      departamentos.find((d) => Number(d.id) === Number(id))?.nome || "-"
-    );
+    return departamentos.find((d) => Number(d.id) === Number(id))?.nome || "-";
   };
 
+  const departamentosOrdenados = useMemo(() => {
+    return [...departamentos].sort((a, b) =>
+      (a.nome || "").localeCompare(b.nome || "")
+    );
+  }, [departamentos]);
+
+  const funcoesOrdenadas = useMemo(() => {
+    return [...funcoes].sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+  }, [funcoes]);
+
+  const fornecedoresOrdenados = useMemo(() => {
+    return [...fornecedores].sort((a, b) =>
+      (a.razao_social || "").localeCompare(b.razao_social || "")
+    );
+  }, [fornecedores]);
+
+  const usuariosSistemaOrdenados = useMemo(() => {
+    return [...usuariosSistema].sort((a, b) =>
+      (a.nome || "").localeCompare(b.nome || "")
+    );
+  }, [usuariosSistema]);
+
   const funcoesDisponiveisForm = useMemo(() => {
-    return funcoes.filter(
+    return funcoesOrdenadas.filter(
       (funcao) => Number(funcao.idDepartamento) === Number(formFuncDepartamento)
     );
-  }, [funcoes, formFuncDepartamento]);
+  }, [funcoesOrdenadas, formFuncDepartamento]);
 
   const funcionariosResolvidos = useMemo(() => {
     return funcionarios.map((f) => ({
@@ -794,32 +507,38 @@ function Administracao() {
   }, [epis, buscaEpi, tiposProtecao]);
 
   const adicionarFornecedor = async () => {
-    if (!novoForn.razao_social || !novoForn.cnpj) {
+    const razaoSocial = novoForn.razao_social.trim();
+    const nomeFantasia = novoForn.nome_fantasia.trim();
+    const cnpj = novoForn.cnpj.trim();
+    const inscricaoEstadual = novoForn.inscricao_estadual.trim();
+
+    if (!razaoSocial || !cnpj) {
       alert("Preencha a razão social e o CNPJ.");
+      return;
+    }
+
+    const cnpjJaExiste = fornecedores.some(
+      (item) => String(item.cnpj || "").trim() === cnpj
+    );
+
+    if (cnpjJaExiste) {
+      alert("Já existe um fornecedor com esse CNPJ.");
       return;
     }
 
     setCarregando(true);
 
     const payload = {
-      razao_social: novoForn.razao_social,
-      nome_fantasia: novoForn.nome_fantasia,
-      cnpj: novoForn.cnpj,
-      inscricao_estadual: novoForn.inscricao_estadual,
+      razao_social: razaoSocial,
+      nome_fantasia: nomeFantasia,
+      cnpj,
+      inscricao_estadual: inscricaoEstadual,
     };
 
     try {
-      try {
-        await api.post("/fornecedor", payload);
-      } catch (erro) {
-        try {
-          await api.post("/fornecedores", payload);
-        } catch (erro2) {
-          // fallback local
-        }
-      }
+      await tentarPost(["/fornecedor", "/fornecedores"], payload);
 
-      const item = { id: Date.now(), ...payload };
+      const item = normalizarFornecedor({ id: Date.now(), ...payload });
       setFornecedores((prev) => [item, ...prev]);
       setNovoForn({
         razao_social: "",
@@ -833,18 +552,18 @@ function Administracao() {
   };
 
   const adicionarUsuarioSistema = async () => {
-    if (
-      !novoUsuario.nome.trim() ||
-      !novoUsuario.matricula.trim() ||
-      !novoUsuario.email.trim() ||
-      !novoUsuario.senha.trim()
-    ) {
+    const nome = novoUsuario.nome.trim();
+    const matricula = novoUsuario.matricula.trim();
+    const email = novoUsuario.email.trim();
+    const senha = novoUsuario.senha.trim();
+
+    if (!nome || !matricula || !email || !senha) {
       alert("Preencha nome, matrícula, e-mail e senha do colaborador.");
       return;
     }
 
     const emailJaExiste = usuariosSistema.some(
-      (u) => u.email.toLowerCase() === novoUsuario.email.toLowerCase()
+      (u) => (u.email || "").toLowerCase() === email.toLowerCase()
     );
 
     if (emailJaExiste) {
@@ -853,7 +572,7 @@ function Administracao() {
     }
 
     const matriculaJaExiste = usuariosSistema.some(
-      (u) => String(u.matricula) === String(novoUsuario.matricula)
+      (u) => String(u.matricula || "") === matricula
     );
 
     if (matriculaJaExiste) {
@@ -864,28 +583,19 @@ function Administracao() {
     setCarregando(true);
 
     const payload = {
-      nome: novoUsuario.nome.trim(),
-      matricula: novoUsuario.matricula.trim(),
-      email: novoUsuario.email.trim(),
-      senha: novoUsuario.senha,
+      nome,
+      matricula,
+      email,
+      senha,
       perfil: novoUsuario.perfil,
       status: novoUsuario.status,
     };
 
     try {
-      try {
-        await api.post("/usuario-sistema", payload);
-      } catch (erro) {
-        try {
-          await api.post("/usuarios", payload);
-        } catch (erro2) {
-          try {
-            await api.post("/acessos", payload);
-          } catch (erro3) {
-            // fallback local
-          }
-        }
-      }
+      await tentarPost(
+        ["/usuario-sistema", "/usuarios", "/acessos", "/cadastro-user"],
+        payload
+      );
 
       const novoRegistro = normalizarUsuarioSistema({
         id: Date.now(),
@@ -908,27 +618,33 @@ function Administracao() {
   };
 
   const adicionarDepartamento = async () => {
-    if (!novoDepto.trim()) {
+    const nome = novoDepto.trim();
+
+    if (!nome) {
       alert("Digite o nome do departamento.");
+      return;
+    }
+
+    const jaExiste = departamentos.some(
+      (item) => (item.nome || "").toLowerCase() === nome.toLowerCase()
+    );
+
+    if (jaExiste) {
+      alert("Já existe um departamento com esse nome.");
       return;
     }
 
     setCarregando(true);
 
-    const payload = { nome: novoDepto.trim() };
+    const payload = { nome };
 
     try {
-      try {
-        await api.post("/departamento", payload);
-      } catch (erro) {
-        try {
-          await api.post("/departamentos", payload);
-        } catch (erro2) {
-          // fallback local
-        }
-      }
+      await tentarPost(
+        ["/departamento", "/departamentos", "/cadastro-departamento"],
+        payload
+      );
 
-      const item = { id: Date.now(), ...payload };
+      const item = normalizarDepartamento({ id: Date.now(), ...payload });
       setDepartamentos((prev) => [item, ...prev]);
       setNovoDepto("");
     } finally {
@@ -937,34 +653,39 @@ function Administracao() {
   };
 
   const adicionarFuncao = async () => {
-    if (!novaFuncao.nome || !novaFuncao.idDepartamento) {
+    const nome = novaFuncao.nome.trim();
+    const idDepartamento = Number(novaFuncao.idDepartamento);
+
+    if (!nome || !idDepartamento) {
       alert("Preencha o nome da função e selecione o departamento.");
+      return;
+    }
+
+    const jaExiste = funcoes.some(
+      (item) =>
+        Number(item.idDepartamento) === idDepartamento &&
+        (item.nome || "").toLowerCase() === nome.toLowerCase()
+    );
+
+    if (jaExiste) {
+      alert("Essa função já existe nesse departamento.");
       return;
     }
 
     setCarregando(true);
 
     const payload = {
-      nome: novaFuncao.nome.trim(),
-      idDepartamento: Number(novaFuncao.idDepartamento),
+      nome,
+      idDepartamento,
     };
 
     try {
-      try {
-        await api.post("/funcao", payload);
-      } catch (erro) {
-        try {
-          await api.post("/funcoes", payload);
-        } catch (erro2) {
-          try {
-            await api.post("/cargo", payload);
-          } catch (erro3) {
-            // fallback local
-          }
-        }
-      }
+      await tentarPost(
+        ["/funcao", "/funcoes", "/cargo", "/cadastro-funcao"],
+        payload
+      );
 
-      const item = { id: Date.now(), ...payload };
+      const item = normalizarFuncao({ id: Date.now(), ...payload });
       setFuncoes((prev) => [item, ...prev]);
       setNovaFuncao({ nome: "", idDepartamento: "" });
     } finally {
@@ -975,15 +696,7 @@ function Administracao() {
   const removerFornecedor = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este fornecedor?")) return;
 
-    try {
-      await api.delete(`/fornecedor/${id}`);
-    } catch (erro) {
-      try {
-        await api.delete(`/fornecedores/${id}`);
-      } catch (erro2) {
-        // fallback local
-      }
-    }
+    await tentarDelete([`/fornecedor/${id}`, `/fornecedores/${id}`]);
 
     setFornecedores((prev) =>
       prev.filter((item) => Number(item.id) !== Number(id))
@@ -993,19 +706,11 @@ function Administracao() {
   const removerUsuarioSistema = async (id) => {
     if (!window.confirm("Tem certeza que deseja remover este acesso?")) return;
 
-    try {
-      await api.delete(`/usuario-sistema/${id}`);
-    } catch (erro) {
-      try {
-        await api.delete(`/usuarios/${id}`);
-      } catch (erro2) {
-        try {
-          await api.delete(`/acessos/${id}`);
-        } catch (erro3) {
-          // fallback local
-        }
-      }
-    }
+    await tentarDelete([
+      `/usuario-sistema/${id}`,
+      `/usuarios/${id}`,
+      `/acessos/${id}`,
+    ]);
 
     setUsuariosSistema((prev) =>
       prev.filter((item) => Number(item.id) !== Number(id))
@@ -1015,15 +720,7 @@ function Administracao() {
   const removerDepartamento = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este departamento?")) return;
 
-    try {
-      await api.delete(`/departamento/${id}`);
-    } catch (erro) {
-      try {
-        await api.delete(`/departamentos/${id}`);
-      } catch (erro2) {
-        // fallback local
-      }
-    }
+    await tentarDelete([`/departamento/${id}`, `/departamentos/${id}`]);
 
     setDepartamentos((prev) =>
       prev.filter((item) => Number(item.id) !== Number(id))
@@ -1036,19 +733,7 @@ function Administracao() {
   const removerFuncao = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir esta função?")) return;
 
-    try {
-      await api.delete(`/funcao/${id}`);
-    } catch (erro) {
-      try {
-        await api.delete(`/funcoes/${id}`);
-      } catch (erro2) {
-        try {
-          await api.delete(`/cargo/${id}`);
-        } catch (erro3) {
-          // fallback local
-        }
-      }
-    }
+    await tentarDelete([`/funcao/${id}`, `/funcoes/${id}`, `/cargo/${id}`]);
 
     setFuncoes((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
   };
@@ -1081,44 +766,51 @@ function Administracao() {
   };
 
   const salvarFuncionario = async () => {
-    if (
-      !formFuncNome ||
-      !formFuncMatricula ||
-      !formFuncDepartamento ||
-      !formFuncFuncao
-    ) {
+    const nome = formFuncNome.trim();
+    const matricula = formFuncMatricula.trim();
+    const idDepartamento = Number(formFuncDepartamento);
+    const idFuncao = Number(formFuncFuncao);
+
+    if (!nome || !matricula || !idDepartamento || !idFuncao) {
       alert("Preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    const matriculaJaExiste = funcionarios.some((f) => {
+      if (funcionarioEditando && Number(f.id) === Number(funcionarioEditando.id)) {
+        return false;
+      }
+      return String(f.matricula || "") === matricula;
+    });
+
+    if (matriculaJaExiste) {
+      alert("Já existe um funcionário com essa matrícula.");
       return;
     }
 
     setSalvandoFuncionario(true);
 
     const payload = {
-      nome: formFuncNome,
-      matricula: formFuncMatricula,
-      idDepartamento: Number(formFuncDepartamento),
-      idFuncao: Number(formFuncFuncao),
+      nome,
+      matricula,
+      idDepartamento,
+      idFuncao,
     };
 
     try {
       if (funcionarioEditando) {
-        try {
-          await api.put(`/funcionario/${funcionarioEditando.id}`, payload);
-        } catch (erro) {
-          try {
-            await api.put(`/funcionarios/${funcionarioEditando.id}`, payload);
-          } catch (erro2) {
-            // fallback local
-          }
-        }
+        await tentarPut(
+          [
+            `/funcionario/${funcionarioEditando.id}`,
+            `/funcionarios/${funcionarioEditando.id}`,
+          ],
+          payload
+        );
 
         setFuncionarios((prev) =>
           prev.map((f) =>
             Number(f.id) === Number(funcionarioEditando.id)
-              ? {
-                  ...f,
-                  ...payload,
-                }
+              ? { ...f, ...payload }
               : f
           )
         );
@@ -1127,17 +819,16 @@ function Administracao() {
         return;
       }
 
-      try {
-        await api.post("/funcionario", payload);
-      } catch (erro) {
-        try {
-          await api.post("/funcionarios", payload);
-        } catch (erro2) {
-          // fallback local
-        }
-      }
+      await tentarPost(
+        ["/funcionario", "/funcionarios", "/cadastro-funcionario"],
+        payload
+      );
 
-      setFuncionarios((prev) => [{ id: Date.now(), ...payload }, ...prev]);
+      setFuncionarios((prev) => [
+        normalizarFuncionario({ id: Date.now(), ...payload }),
+        ...prev,
+      ]);
+
       fecharModalFuncionario();
     } finally {
       setSalvandoFuncionario(false);
@@ -1147,15 +838,7 @@ function Administracao() {
   const excluirFuncionario = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este funcionário?")) return;
 
-    try {
-      await api.delete(`/funcionario/${id}`);
-    } catch (erro) {
-      try {
-        await api.delete(`/funcionarios/${id}`);
-      } catch (erro2) {
-        // fallback local
-      }
-    }
+    await tentarDelete([`/funcionario/${id}`, `/funcionarios/${id}`]);
 
     setFuncionarios((prev) => prev.filter((f) => Number(f.id) !== Number(id)));
   };
@@ -1172,7 +855,7 @@ function Administracao() {
     setAbaAtiva("epis");
   };
 
-  if (!acessoLiberado) {
+  if (!podeAcessarPainel) {
     return (
       <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
         <div className="max-w-md mx-auto py-8">
@@ -1233,17 +916,19 @@ function Administracao() {
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setAcessoLiberado(false);
-              setSenhaAcesso("");
-              setErroSenha("");
-              setAbaAtiva("fornecedores");
-            }}
-            className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition w-full sm:w-auto"
-          >
-            🔐 Bloquear Área
-          </button>
+          {!adminPorPerfil && !adminPorPermissao && (
+            <button
+              onClick={() => {
+                setAcessoLiberado(false);
+                setSenhaAcesso("");
+                setErroSenha("");
+                setAbaAtiva("fornecedores");
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition w-full sm:w-auto"
+            >
+              🔐 Bloquear Área
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4 mb-6">
@@ -1397,18 +1082,18 @@ function Administracao() {
                   Fornecedores cadastrados
                 </h3>
                 <span className="text-xs text-slate-400">
-                  {fornecedores.length} registro(s)
+                  {fornecedoresOrdenados.length} registro(s)
                 </span>
               </div>
 
-              {fornecedores.length === 0 ? (
+              {fornecedoresOrdenados.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-gray-400 italic">
                   Nenhum fornecedor registrado.
                 </div>
               ) : (
                 <>
                   <div className="md:hidden space-y-3">
-                    {fornecedores.map((f) => (
+                    {fornecedoresOrdenados.map((f) => (
                       <div
                         key={f.id}
                         className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
@@ -1476,7 +1161,7 @@ function Administracao() {
                       </thead>
 
                       <tbody className="divide-y divide-slate-100">
-                        {fornecedores.map((f) => (
+                        {fornecedoresOrdenados.map((f) => (
                           <tr key={f.id} className="hover:bg-slate-50">
                             <td className="p-3 font-medium text-slate-800">
                               {f.razao_social || "-"}
@@ -1598,6 +1283,7 @@ function Administracao() {
                     }
                   >
                     <option value="colaborador">Colaborador</option>
+                    <option value="gerente">Gerente</option>
                     <option value="admin">Administrador</option>
                   </select>
                 </div>
@@ -1639,18 +1325,18 @@ function Administracao() {
                   Colaboradores com acesso
                 </h3>
                 <span className="text-xs text-slate-400">
-                  {usuariosSistema.length} registro(s)
+                  {usuariosSistemaOrdenados.length} registro(s)
                 </span>
               </div>
 
-              {usuariosSistema.length === 0 ? (
+              {usuariosSistemaOrdenados.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-gray-400 italic">
                   Nenhum login cadastrado.
                 </div>
               ) : (
                 <>
                   <div className="md:hidden space-y-3">
-                    {usuariosSistema.map((u) => (
+                    {usuariosSistemaOrdenados.map((u) => (
                       <div
                         key={u.id}
                         className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
@@ -1736,7 +1422,7 @@ function Administracao() {
                       </thead>
 
                       <tbody className="divide-y divide-slate-100">
-                        {usuariosSistema.map((u) => (
+                        {usuariosSistemaOrdenados.map((u) => (
                           <tr key={u.id} className="hover:bg-slate-50">
                             <td className="p-3 font-medium text-slate-800">
                               {u.nome || "-"}
@@ -1805,7 +1491,7 @@ function Administracao() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {departamentos.map((d) => (
+              {departamentosOrdenados.map((d) => (
                 <div
                   key={d.id}
                   className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm hover:shadow-md transition"
@@ -1849,7 +1535,7 @@ function Administracao() {
                     }
                   >
                     <option value="">Selecione...</option>
-                    {departamentos.map((d) => (
+                    {departamentosOrdenados.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.nome}
                       </option>
@@ -1897,7 +1583,7 @@ function Administracao() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {funcoes.map((f) => (
+                  {funcoesOrdenadas.map((f) => (
                     <tr key={f.id} className="hover:bg-slate-50">
                       <td className="p-3 font-medium text-slate-800">
                         {f.nome}
@@ -2288,7 +1974,7 @@ function Administracao() {
                   }}
                 >
                   <option value="">Selecione...</option>
-                  {departamentos.map((d) => (
+                  {departamentosOrdenados.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.nome}
                     </option>
@@ -2344,8 +2030,6 @@ function Administracao() {
         <ModalNovoEpi
           onClose={() => setModalEpiAberto(false)}
           onSalvar={aoSalvarEpi}
-          tiposProtecao={tiposProtecao}
-          fornecedores={fornecedores}
         />
       )}
     </>

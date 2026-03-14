@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-
 import ModalEntrada from "../components/modals/ModalEntrada";
 import ModalEntrega from "../components/modals/ModalEntrega";
 import ModalBaixa from "../components/modals/ModalBaixa";
 import ModalBusca from "../components/modals/ModalBusca";
 import { api } from "../services/api";
+import { temPermissao } from "../utils/permissoes";
 
 const mockEpis = [
   {
@@ -242,28 +242,28 @@ function normalizarEntrada(item) {
     id: Number(item?.id ?? 0),
     idEpi: Number(
       item?.idEpi ??
-      item?.epi_id ??
-      item?.epiId ??
-      item?.id_epi ??
-      item?.idProduto ??
-      item?.produto_id ??
-      0
+        item?.epi_id ??
+        item?.epiId ??
+        item?.id_epi ??
+        item?.idProduto ??
+        item?.produto_id ??
+        0
     ),
     idTamanho: Number(
       item?.idTamanho ??
-      item?.tamanho_id ??
-      item?.tamanhoId ??
-      item?.id_tamanho ??
-      0
+        item?.tamanho_id ??
+        item?.tamanhoId ??
+        item?.id_tamanho ??
+        0
     ),
     quantidade: Number(item?.quantidade ?? 0),
     quantidadeAtual: Number(
       item?.quantidadeAtual ??
-      item?.quantidade_atual ??
-      item?.estoqueAtual ??
-      item?.estoque_atual ??
-      item?.quantidade ??
-      0
+        item?.quantidade_atual ??
+        item?.estoqueAtual ??
+        item?.estoque_atual ??
+        item?.quantidade ??
+        0
     ),
     valor_unitario: Number(
       item?.valor_unitario ?? item?.valorUnitario ?? item?.preco ?? 0
@@ -280,11 +280,11 @@ function normalizarEntrega(item) {
     id: Number(item?.id ?? 0),
     idFuncionario: Number(
       item?.idFuncionario ??
-      item?.funcionario_id ??
-      item?.funcionarioId ??
-      item?.funcionario?.id ??
-      item?.id_funcionario ??
-      0
+        item?.funcionario_id ??
+        item?.funcionarioId ??
+        item?.funcionario?.id ??
+        item?.id_funcionario ??
+        0
     ),
     data_entrega: item?.data_entrega ?? item?.dataEntrega ?? item?.data ?? "",
     assinatura: item?.assinatura ?? null,
@@ -297,25 +297,25 @@ function normalizarItemEntregue(item) {
     id: item?.id ?? Date.now() + Math.random(),
     idEntrega: Number(
       item?.idEntrega ??
-      item?.entrega_id ??
-      item?.entregaId ??
-      item?.id_entrega ??
-      0
+        item?.entrega_id ??
+        item?.entregaId ??
+        item?.id_entrega ??
+        0
     ),
     idEpi: Number(
       item?.idEpi ??
-      item?.epi_id ??
-      item?.epiId ??
-      item?.id_epi ??
-      item?.produto_id ??
-      0
+        item?.epi_id ??
+        item?.epiId ??
+        item?.id_epi ??
+        item?.produto_id ??
+        0
     ),
     idTamanho: Number(
       item?.idTamanho ??
-      item?.tamanho_id ??
-      item?.tamanhoId ??
-      item?.id_tamanho ??
-      0
+        item?.tamanho_id ??
+        item?.tamanhoId ??
+        item?.id_tamanho ??
+        0
     ),
     quantidade: Number(item?.quantidade ?? 0),
     epiNome: item?.epiNome ?? item?.epi_nome ?? "",
@@ -326,7 +326,8 @@ function normalizarItemEntregue(item) {
 function normalizarDevolucao(item) {
   return {
     id: Number(item?.id ?? 0),
-    data_devolucao: item?.data_devolucao ?? item?.dataDevolucao ?? item?.data ?? "",
+    data_devolucao:
+      item?.data_devolucao ?? item?.dataDevolucao ?? item?.data ?? "",
   };
 }
 
@@ -354,7 +355,9 @@ function ModalDetalhesDashboard({
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-lg md:text-xl font-bold truncate">{titulo}</h3>
+                  <h3 className="text-lg md:text-xl font-bold truncate">
+                    {titulo}
+                  </h3>
                   <p className="text-sm text-slate-300 mt-1">{subtitulo}</p>
                 </div>
               </div>
@@ -382,7 +385,10 @@ function ModalDetalhesDashboard({
                   <thead className="bg-gray-100 text-gray-600 text-sm uppercase">
                     <tr>
                       {colunas.map((coluna) => (
-                        <th key={coluna.key} className="p-4 font-semibold whitespace-nowrap">
+                        <th
+                          key={coluna.key}
+                          className="p-4 font-semibold whitespace-nowrap"
+                        >
                           {coluna.label}
                         </th>
                       ))}
@@ -391,7 +397,10 @@ function ModalDetalhesDashboard({
 
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {dados.map((item, index) => (
-                      <tr key={item.id ?? index} className="hover:bg-gray-50 transition">
+                      <tr
+                        key={item.id ?? index}
+                        className="hover:bg-gray-50 transition"
+                      >
                         {colunas.map((coluna) => (
                           <td
                             key={`${coluna.key}-${item.id ?? index}`}
@@ -465,6 +474,10 @@ function Dashboard({ usuarioLogado }) {
   const fecharDetalheCard = () => setDetalheCardAberto(null);
 
   const nomeExibicao = usuarioLogado?.nome || "usuário";
+
+  const podeVisualizarDashboard = !usuarioLogado
+    ? true
+    : temPermissao(usuarioLogado, "visualizar_dashboard");
 
   const carregarResumo = async () => {
     setCarregandoResumo(true);
@@ -659,7 +672,8 @@ function Dashboard({ usuarioLogado }) {
 
       mapa[chave].quantidade += Number(entrada.quantidadeAtual || 0);
       mapa[chave].valorTotal +=
-        Number(entrada.quantidadeAtual || 0) * Number(entrada.valor_unitario || 0);
+        Number(entrada.quantidadeAtual || 0) *
+        Number(entrada.valor_unitario || 0);
     });
 
     return Object.values(mapa)
@@ -680,13 +694,15 @@ function Dashboard({ usuarioLogado }) {
     ).length;
 
     const devolucoesHoje = devolucoes.filter(
-      (devolucao) => String(devolucao.data_devolucao || "").substring(0, 10) === hoje
+      (devolucao) =>
+        String(devolucao.data_devolucao || "").substring(0, 10) === hoje
     ).length;
 
     const valorTotal = entradas.reduce(
       (acc, entrada) =>
         acc +
-        Number(entrada.quantidadeAtual || 0) * Number(entrada.valor_unitario || 0),
+        Number(entrada.quantidadeAtual || 0) *
+          Number(entrada.valor_unitario || 0),
       0
     );
 
@@ -753,8 +769,12 @@ function Dashboard({ usuarioLogado }) {
             label: "Para quem foi entregue",
             render: (item) => (
               <div>
-                <div className="font-semibold text-gray-800">{item.funcionario}</div>
-                <div className="text-xs text-gray-500">Matrícula: {item.matricula}</div>
+                <div className="font-semibold text-gray-800">
+                  {item.funcionario}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Matrícula: {item.matricula}
+                </div>
               </div>
             ),
           },
@@ -764,14 +784,18 @@ function Dashboard({ usuarioLogado }) {
             render: (item) => (
               <div>
                 <div className="font-medium">{item.item}</div>
-                <div className="text-xs text-gray-500">Tamanho: {item.tamanho}</div>
+                <div className="text-xs text-gray-500">
+                  Tamanho: {item.tamanho}
+                </div>
               </div>
             ),
           },
           {
             key: "quantidade",
             label: "Quantidade",
-            render: (item) => <span className="font-bold">{item.quantidade}</span>,
+            render: (item) => (
+              <span className="font-bold">{item.quantidade}</span>
+            ),
           },
         ],
       };
@@ -780,7 +804,8 @@ function Dashboard({ usuarioLogado }) {
     if (detalheCardAberto === "alertas") {
       return {
         titulo: "Itens com alerta de estoque",
-        subtitulo: "Itens que estão acabando com base no alerta mínimo configurado.",
+        subtitulo:
+          "Itens que estão acabando com base no alerta mínimo configurado.",
         icon: "⚠️",
         dados: alertasDetalhados,
         colunas: [
@@ -811,7 +836,9 @@ function Dashboard({ usuarioLogado }) {
             key: "alertaMinimo",
             label: "Alerta Mínimo",
             render: (item) => (
-              <span className="font-semibold text-gray-800">{item.alertaMinimo}</span>
+              <span className="font-semibold text-gray-800">
+                {item.alertaMinimo}
+              </span>
             ),
           },
         ],
@@ -917,6 +944,18 @@ function Dashboard({ usuarioLogado }) {
     },
   ];
 
+  if (!podeVisualizarDashboard) {
+    return (
+      <div className="animate-fade-in">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-amber-700">
+            Você não tem permissão para visualizar o dashboard.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in pb-20 md:pb-0">
       <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -930,7 +969,9 @@ function Dashboard({ usuarioLogado }) {
         </div>
 
         <div className="hidden md:block text-right">
-          <p className="text-xs font-bold text-gray-400 uppercase">Status do Sistema</p>
+          <p className="text-xs font-bold text-gray-400 uppercase">
+            Status do Sistema
+          </p>
           <div className="flex items-center gap-2 justify-end">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
             <span className="text-sm font-semibold text-gray-700">
@@ -984,7 +1025,9 @@ function Dashboard({ usuarioLogado }) {
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-500 leading-relaxed">{card.descricao}</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {card.descricao}
+              </p>
 
               <span className="text-blue-600 font-bold text-xs md:text-sm opacity-80 group-hover:translate-x-1 transition">
                 Abrir →
@@ -1033,7 +1076,9 @@ function Dashboard({ usuarioLogado }) {
           className="group flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
         >
           <div className="flex flex-col items-start text-left">
-            <span className="font-bold text-base md:text-lg">Registrar Entrada</span>
+            <span className="font-bold text-base md:text-lg">
+              Registrar Entrada
+            </span>
             <span className="text-xs text-emerald-100 group-hover:text-white transition">
               Repor estoque / Compras
             </span>
@@ -1048,7 +1093,9 @@ function Dashboard({ usuarioLogado }) {
           className="group flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
         >
           <div className="flex flex-col items-start text-left">
-            <span className="font-bold text-base md:text-lg">Realizar Entrega</span>
+            <span className="font-bold text-base md:text-lg">
+              Realizar Entrega
+            </span>
             <span className="text-xs text-blue-100 group-hover:text-white transition">
               Entregar EPI ao funcionário
             </span>
@@ -1063,7 +1110,9 @@ function Dashboard({ usuarioLogado }) {
           className="group flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
         >
           <div className="flex flex-col items-start text-left">
-            <span className="font-bold text-base md:text-lg">Devolução / Baixa</span>
+            <span className="font-bold text-base md:text-lg">
+              Devolução / Baixa
+            </span>
             <span className="text-xs text-rose-100 group-hover:text-white transition">
               Registrar devolução, dano ou descarte
             </span>
@@ -1079,7 +1128,9 @@ function Dashboard({ usuarioLogado }) {
         >
           <span className="text-xl md:text-2xl">🔍</span>
           <div className="flex flex-col items-start text-left">
-            <span className="font-bold text-base md:text-lg">Consultar Estoque Rápido</span>
+            <span className="font-bold text-base md:text-lg">
+              Consultar Estoque Rápido
+            </span>
             <span className="text-xs text-gray-400 group-hover:text-blue-400 transition">
               Pesquisar por CA, nome, fabricante ou lote
             </span>
@@ -1098,14 +1149,35 @@ function Dashboard({ usuarioLogado }) {
       />
 
       {modalAberto === "entrada" && (
-        <ModalEntrada onClose={fecharModal} onSalvar={carregarResumo} />
+        <ModalEntrada
+          onClose={fecharModal}
+          onSalvar={async () => {
+            await carregarResumo();
+            fecharModal();
+          }}
+        />
       )}
+
       {modalAberto === "entrega" && (
-        <ModalEntrega onClose={fecharModal} onSalvar={carregarResumo} />
+        <ModalEntrega
+          onClose={fecharModal}
+          onSalvar={async () => {
+            await carregarResumo();
+            fecharModal();
+          }}
+        />
       )}
+
       {modalAberto === "baixa" && (
-        <ModalBaixa onClose={fecharModal} onSalvar={carregarResumo} />
+        <ModalBaixa
+          onClose={fecharModal}
+          onSalvar={async () => {
+            await carregarResumo();
+            fecharModal();
+          }}
+        />
       )}
+
       {modalAberto === "busca" && <ModalBusca onClose={fecharModal} />}
     </div>
   );

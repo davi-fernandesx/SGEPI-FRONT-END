@@ -20,6 +20,7 @@ const tamanhosPadrao = [
   "43",
   "44",
   "45",
+  "46",
   "Único",
 ];
 
@@ -51,8 +52,17 @@ async function buscarPrimeiraLista(rotas, fallback = []) {
   return fallback;
 }
 
+function normalizarTipoProtecao(item) {
+  return {
+    id: Number(item?.id ?? item?.ID ?? 0),
+    nome: item?.nome ?? item?.Nome ?? item?.descricao ?? "",
+  };
+}
+
 function ModalNovoEpi({ onClose, onSalvar }) {
-  const [carregando, setCarregando] = useState(false);
+  const [carregandoTipos, setCarregandoTipos] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erroCarregamento, setErroCarregamento] = useState("");
   const [tiposProtecao, setTiposProtecao] = useState([]);
 
   const [form, setForm] = useState({
@@ -67,16 +77,40 @@ function ModalNovoEpi({ onClose, onSalvar }) {
   });
 
   useEffect(() => {
-    async function carregarDados() {
-      const listaTipos = await buscarPrimeiraLista(
-        ["/tipo-protecao", "/tipos-protecao", "/tipos_protecao"],
-        mockTiposProtecao
-      );
+    let ativo = true;
 
-      setTiposProtecao(listaTipos);
+    async function carregarDados() {
+      setCarregandoTipos(true);
+      setErroCarregamento("");
+
+      try {
+        const listaTipos = await buscarPrimeiraLista(
+          ["/tipo-protecao", "/tipos-protecao", "/tipos_protecao"],
+          mockTiposProtecao
+        );
+
+        if (!ativo) return;
+
+        setTiposProtecao(listaTipos.map(normalizarTipoProtecao));
+      } catch (erro) {
+        if (!ativo) return;
+
+        setTiposProtecao(mockTiposProtecao.map(normalizarTipoProtecao));
+        setErroCarregamento(
+          "Não foi possível carregar os tipos de proteção do servidor. Usando lista local."
+        );
+      } finally {
+        if (ativo) {
+          setCarregandoTipos(false);
+        }
+      }
     }
 
     carregarDados();
+
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   const tamanhosSelecionadosTexto = useMemo(() => {
@@ -111,8 +145,26 @@ function ModalNovoEpi({ onClose, onSalvar }) {
     }));
   }
 
+  function limparFormulario() {
+    setForm({
+      nome: "",
+      idTipoProtecao: "",
+      fabricante: "",
+      CA: "",
+      alerta_minimo: "",
+      descricao: "",
+      validade_CA: "",
+      tamanhos: [],
+    });
+  }
+
   async function salvarEpi() {
-    if (!form.nome.trim()) {
+    const nome = form.nome.trim();
+    const fabricante = form.fabricante.trim();
+    const CA = form.CA.trim();
+    const descricao = form.descricao.trim();
+
+    if (!nome) {
       alert("Preencha o nome do EPI.");
       return;
     }
@@ -122,35 +174,55 @@ function ModalNovoEpi({ onClose, onSalvar }) {
       return;
     }
 
-    setCarregando(true);
+    if (Number(form.alerta_minimo || 0) < 0) {
+      alert("O alerta mínimo não pode ser negativo.");
+      return;
+    }
+
+    const tamanhosUnicos = [...new Set(form.tamanhos.map((t) => String(t).trim()).filter(Boolean))];
 
     const payload = {
-      nome: form.nome.trim(),
-      fabricante: form.fabricante.trim(),
-      CA: form.CA.trim(),
-      descricao: form.descricao.trim(),
+      nome,
+      fabricante,
+      CA,
+      descricao,
       validade_CA: form.validade_CA || null,
       idTipoProtecao: Number(form.idTipoProtecao),
       alerta_minimo: Number(form.alerta_minimo || 0),
-      tamanhos: form.tamanhos,
+      tamanhos: tamanhosUnicos,
+      tamanhos_disponiveis: tamanhosUnicos,
     };
 
+    setSalvando(true);
+
     try {
+      let resposta = null;
+
       try {
-        await api.post("/epi", payload);
-      } catch (erro) {
+        resposta = await api.post("/epi", payload);
+      } catch (erro1) {
         try {
-          await api.post("/epis", payload);
+          resposta = await api.post("/epis", payload);
         } catch (erro2) {
-          // fallback local
+          resposta = await api.post("/produtos", payload);
         }
       }
 
+      const epiSalvo = {
+        id: Number(resposta?.id ?? Date.now()),
+        ...payload,
+      };
+
       if (onSalvar) {
-        await onSalvar(payload);
+        await onSalvar(epiSalvo);
+      } else {
+        limparFormulario();
+        onClose?.();
       }
+    } catch (erro) {
+      alert(erro.message || "Erro ao cadastrar EPI.");
     } finally {
-      setCarregando(false);
+      setSalvando(false);
     }
   }
 
@@ -174,6 +246,7 @@ function ModalNovoEpi({ onClose, onSalvar }) {
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 text-4xl leading-none"
           >
@@ -182,6 +255,12 @@ function ModalNovoEpi({ onClose, onSalvar }) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-8">
+          {erroCarregamento && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {erroCarregamento}
+            </div>
+          )}
+
           <div className="space-y-10">
             <section>
               <h4 className="text-sm font-extrabold tracking-wide text-slate-400 uppercase mb-5">
@@ -208,12 +287,13 @@ function ModalNovoEpi({ onClose, onSalvar }) {
                   </label>
                   <select
                     value={form.idTipoProtecao}
-                    onChange={(e) =>
-                      atualizarCampo("idTipoProtecao", e.target.value)
-                    }
-                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => atualizarCampo("idTipoProtecao", e.target.value)}
+                    disabled={carregandoTipos}
+                    className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                   >
-                    <option value="">Selecione...</option>
+                    <option value="">
+                      {carregandoTipos ? "Carregando..." : "Selecione..."}
+                    </option>
                     {tiposProtecao.map((tipo) => (
                       <option key={tipo.id} value={tipo.id}>
                         {tipo.nome}
@@ -229,9 +309,7 @@ function ModalNovoEpi({ onClose, onSalvar }) {
                   <input
                     type="text"
                     value={form.fabricante}
-                    onChange={(e) =>
-                      atualizarCampo("fabricante", e.target.value)
-                    }
+                    onChange={(e) => atualizarCampo("fabricante", e.target.value)}
                     placeholder="Ex: Bracol"
                     className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -258,9 +336,7 @@ function ModalNovoEpi({ onClose, onSalvar }) {
                     type="number"
                     min="0"
                     value={form.alerta_minimo}
-                    onChange={(e) =>
-                      atualizarCampo("alerta_minimo", e.target.value)
-                    }
+                    onChange={(e) => atualizarCampo("alerta_minimo", e.target.value)}
                     placeholder="Ex: 10"
                     className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -272,9 +348,7 @@ function ModalNovoEpi({ onClose, onSalvar }) {
                   </label>
                   <textarea
                     value={form.descricao}
-                    onChange={(e) =>
-                      atualizarCampo("descricao", e.target.value)
-                    }
+                    onChange={(e) => atualizarCampo("descricao", e.target.value)}
                     placeholder="Descreva o EPI, finalidade ou observações importantes..."
                     className="w-full min-h-[120px] p-4 border border-slate-300 rounded-xl text-lg text-slate-700 placeholder:text-slate-400 outline-none resize-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -343,9 +417,7 @@ function ModalNovoEpi({ onClose, onSalvar }) {
                   <input
                     type="date"
                     value={form.validade_CA}
-                    onChange={(e) =>
-                      atualizarCampo("validade_CA", e.target.value)
-                    }
+                    onChange={(e) => atualizarCampo("validade_CA", e.target.value)}
                     className="w-full h-14 px-4 border border-slate-300 rounded-xl text-lg text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -356,18 +428,21 @@ function ModalNovoEpi({ onClose, onSalvar }) {
 
         <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-4">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-3 text-slate-700 text-sm md:text-base font-semibold hover:text-slate-900 transition"
+            disabled={salvando}
+            className="px-4 py-3 text-slate-700 text-sm md:text-base font-semibold hover:text-slate-900 transition disabled:opacity-60"
           >
             Cancelar
           </button>
 
           <button
+            type="button"
             onClick={salvarEpi}
-            disabled={carregando}
+            disabled={salvando || carregandoTipos}
             className="min-w-[190px] h-12 px-6 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition shadow-md disabled:opacity-60"
           >
-            {carregando ? "Salvando..." : "💾 Salvar EPI"}
+            {salvando ? "Salvando..." : "💾 Salvar EPI"}
           </button>
         </div>
       </div>

@@ -184,6 +184,38 @@ function gerarAssinaturaAjustada(canvasOriginal) {
   return canvasFinal.toDataURL("image/png");
 }
 
+async function tentarCriarEntrega(payloads) {
+  let ultimoErro = null;
+
+  for (const tentativa of payloads) {
+    try {
+      const resposta = await api.post(tentativa.rota, tentativa.payload);
+      return resposta;
+    } catch (erro) {
+      ultimoErro = erro;
+    }
+  }
+
+  throw ultimoErro || new Error("Não foi possível registrar a entrega.");
+}
+
+async function tentarSalvarItens(payloads) {
+  let ultimoErro = null;
+
+  for (const tentativa of payloads) {
+    try {
+      await Promise.all(
+        tentativa.lista.map((item) => api.post(tentativa.rota, item))
+      );
+      return true;
+    } catch (erro) {
+      ultimoErro = erro;
+    }
+  }
+
+  throw ultimoErro || new Error("Não foi possível salvar os itens da entrega.");
+}
+
 function ModalEntrega({ onClose, onSalvar }) {
   const [funcionarios, setFuncionarios] = useState([]);
   const [epis, setEpis] = useState([]);
@@ -201,6 +233,7 @@ function ModalEntrega({ onClose, onSalvar }) {
   const [qtdTemp, setQtdTemp] = useState(1);
 
   const [carregando, setCarregando] = useState(false);
+  const [carregandoDados, setCarregandoDados] = useState(true);
 
   const [modalAssinaturaAberto, setModalAssinaturaAberto] = useState(false);
   const [assinaturaPreview, setAssinaturaPreview] = useState("");
@@ -231,17 +264,25 @@ function ModalEntrega({ onClose, onSalvar }) {
     let ativo = true;
 
     async function carregarDados() {
-      const [listaFuncionarios, listaEpis, listaTamanhos] = await Promise.all([
-        buscarPrimeiraLista(["/funcionarios"], mockFuncionarios),
-        buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
-        buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
-      ]);
+      setCarregandoDados(true);
 
-      if (!ativo) return;
+      try {
+        const [listaFuncionarios, listaEpis, listaTamanhos] = await Promise.all([
+          buscarPrimeiraLista(["/funcionarios"], mockFuncionarios),
+          buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
+          buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
+        ]);
 
-      setFuncionarios(listaFuncionarios.map(normalizarFuncionario));
-      setEpis(listaEpis.map(normalizarEpi));
-      setTamanhos(listaTamanhos.map(normalizarTamanho));
+        if (!ativo) return;
+
+        setFuncionarios(listaFuncionarios.map(normalizarFuncionario));
+        setEpis(listaEpis.map(normalizarEpi));
+        setTamanhos(listaTamanhos.map(normalizarTamanho));
+      } finally {
+        if (ativo) {
+          setCarregandoDados(false);
+        }
+      }
     }
 
     carregarDados();
@@ -475,8 +516,20 @@ function ModalEntrega({ onClose, onSalvar }) {
     }
 
     const quantidade = Number(qtdTemp);
+
     if (Number.isNaN(quantidade) || quantidade <= 0) {
       alert("Informe uma quantidade válida.");
+      return;
+    }
+
+    const itemDuplicado = itensParaEntregar.some(
+      (item) =>
+        Number(item.idEpi) === Number(idEpiTemp) &&
+        Number(item.idTamanho) === Number(idTamanhoTemp)
+    );
+
+    if (itemDuplicado) {
+      alert("Esse item com esse tamanho já foi adicionado à entrega.");
       return;
     }
 
@@ -508,7 +561,7 @@ function ModalEntrega({ onClose, onSalvar }) {
     setModalAssinaturaAberto(false);
   }
 
-  function salvarEntrega() {
+  async function salvarEntrega() {
     if (!funcionario) {
       alert("Selecione o funcionário.");
       return;
@@ -528,31 +581,125 @@ function ModalEntrega({ onClose, onSalvar }) {
 
     const tokenValidacao = gerarTokenValidacao();
 
+    const itensNormalizados = itensParaEntregar.map((item) => ({
+      id: item.id,
+      idEpi: Number(item.idEpi),
+      idTamanho: Number(item.idTamanho),
+      quantidade: Number(item.quantidade),
+      epiNome: item.epiNome,
+      tamanhoNome: item.tamanhoNome,
+    }));
+
+    const payloadEntregaBase = {
+      idFuncionario: Number(funcionario),
+      data_entrega: dataEntrega,
+      assinatura: assinaturaPreview,
+      token_validacao: tokenValidacao,
+      itens: itensNormalizados.map((item) => ({
+        idEpi: item.idEpi,
+        idTamanho: item.idTamanho,
+        quantidade: item.quantidade,
+      })),
+    };
+
     const entregaFinal = {
       id: Date.now(),
       idFuncionario: Number(funcionario),
       data_entrega: dataEntrega,
-      assinatura_digital: assinaturaPreview,
+      assinatura: assinaturaPreview,
       token_validacao: tokenValidacao,
-      itens: itensParaEntregar.map((item) => ({
-        id: item.id,
-        idEpi: item.idEpi,
-        idTamanho: item.idTamanho,
-        quantidade: item.quantidade,
-        epiNome: item.epiNome,
-        tamanhoNome: item.tamanhoNome,
-      })),
+      itens: itensNormalizados,
       funcionario: Number(funcionario),
       nome_funcionario: funcionarioSelecionado?.nome || "",
       dataEntrega,
-      assinatura: assinaturaPreview,
     };
 
+    let respostaEntrega = null;
+    let salvouNoServidor = false;
+
     try {
-      if (onSalvar) {
-        onSalvar(entregaFinal);
+      try {
+        respostaEntrega = await tentarCriarEntrega([
+          {
+            rota: "/entrega-epi",
+            payload: payloadEntregaBase,
+          },
+          {
+            rota: "/entrega_epi",
+            payload: payloadEntregaBase,
+          },
+          {
+            rota: "/entregas",
+            payload: payloadEntregaBase,
+          },
+        ]);
+
+        salvouNoServidor = true;
+      } catch (erroEntregaComItens) {
+        const payloadSomenteCabecalho = {
+          idFuncionario: Number(funcionario),
+          data_entrega: dataEntrega,
+          assinatura: assinaturaPreview,
+          token_validacao: tokenValidacao,
+        };
+
+        respostaEntrega = await tentarCriarEntrega([
+          {
+            rota: "/entrega-epi",
+            payload: payloadSomenteCabecalho,
+          },
+          {
+            rota: "/entrega_epi",
+            payload: payloadSomenteCabecalho,
+          },
+          {
+            rota: "/entregas",
+            payload: payloadSomenteCabecalho,
+          },
+        ]);
+
+        const idEntregaServidor = Number(
+          respostaEntrega?.id ??
+            respostaEntrega?.ID ??
+            respostaEntrega?.entrega?.id ??
+            respostaEntrega?.entregaId ??
+            0
+        );
+
+        if (idEntregaServidor > 0) {
+          const itensPayload = itensNormalizados.map((item) => ({
+            idEntrega: idEntregaServidor,
+            idEpi: item.idEpi,
+            idTamanho: item.idTamanho,
+            quantidade: item.quantidade,
+          }));
+
+          await tentarSalvarItens([
+            { rota: "/epis-entregues", lista: itensPayload },
+            { rota: "/epis_entregues", lista: itensPayload },
+          ]);
+        }
+
+        salvouNoServidor = true;
       }
+
+      if (Number(respostaEntrega?.id ?? 0) > 0) {
+        entregaFinal.id = Number(respostaEntrega.id);
+      }
+
+      if (onSalvar) {
+        await onSalvar(entregaFinal);
+      }
+
+      if (!salvouNoServidor) {
+        alert(
+          "Não foi possível salvar no servidor. A entrega foi mantida apenas localmente nesta sessão."
+        );
+      }
+
       onClose();
+    } catch (erro) {
+      alert(erro.message || "Erro ao registrar entrega.");
     } finally {
       setCarregando(false);
     }
@@ -569,10 +716,11 @@ function ModalEntrega({ onClose, onSalvar }) {
           <button
             type="button"
             onClick={() => setFerramentaAtiva("caneta")}
-            className={`w-[64px] h-[42px] rounded-xl border text-[10px] font-bold transition rotate-90 flex items-center justify-center ${ferramentaAtiva === "caneta"
-              ? "bg-blue-700 text-white border-blue-700"
-              : "bg-white text-slate-700 border-slate-300"
-              }`}
+            className={`w-[64px] h-[42px] rounded-xl border text-[10px] font-bold transition rotate-90 flex items-center justify-center ${
+              ferramentaAtiva === "caneta"
+                ? "bg-blue-700 text-white border-blue-700"
+                : "bg-white text-slate-700 border-slate-300"
+            }`}
           >
             ✍️ Caneta
           </button>
@@ -580,10 +728,11 @@ function ModalEntrega({ onClose, onSalvar }) {
           <button
             type="button"
             onClick={() => setFerramentaAtiva("borracha")}
-            className={`w-[64px] h-[42px] rounded-xl border text-[10px] font-bold transition rotate-90 flex items-center justify-center ${ferramentaAtiva === "borracha"
-              ? "bg-slate-800 text-white border-slate-800"
-              : "bg-white text-slate-700 border-slate-300"
-              }`}
+            className={`w-[64px] h-[42px] rounded-xl border text-[10px] font-bold transition rotate-90 flex items-center justify-center ${
+              ferramentaAtiva === "borracha"
+                ? "bg-slate-800 text-white border-slate-800"
+                : "bg-white text-slate-700 border-slate-300"
+            }`}
           >
             🩹 Borracha
           </button>
@@ -617,6 +766,7 @@ function ModalEntrega({ onClose, onSalvar }) {
       </aside>
     );
   }
+
   function renderFerramentasDesktop() {
     return painelFerramentasAberto ? (
       <div className="absolute top-4 right-4 z-10 max-w-[calc(100vw-2rem)]">
@@ -625,10 +775,11 @@ function ModalEntrega({ onClose, onSalvar }) {
             <button
               type="button"
               onClick={() => setFerramentaAtiva("caneta")}
-              className={`px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition ${ferramentaAtiva === "caneta"
-                ? "bg-blue-700 text-white border-blue-700"
-                : "bg-white text-slate-700 border-slate-300"
-                }`}
+              className={`px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition ${
+                ferramentaAtiva === "caneta"
+                  ? "bg-blue-700 text-white border-blue-700"
+                  : "bg-white text-slate-700 border-slate-300"
+              }`}
             >
               ✍️ Escrever
             </button>
@@ -636,10 +787,11 @@ function ModalEntrega({ onClose, onSalvar }) {
             <button
               type="button"
               onClick={() => setFerramentaAtiva("borracha")}
-              className={`px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition ${ferramentaAtiva === "borracha"
-                ? "bg-slate-800 text-white border-slate-800"
-                : "bg-white text-slate-700 border-slate-300"
-                }`}
+              className={`px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition ${
+                ferramentaAtiva === "borracha"
+                  ? "bg-slate-800 text-white border-slate-800"
+                  : "bg-white text-slate-700 border-slate-300"
+              }`}
             >
               🩹 Borracha
             </button>
@@ -724,6 +876,7 @@ function ModalEntrega({ onClose, onSalvar }) {
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition text-xl font-bold"
             >
@@ -732,6 +885,12 @@ function ModalEntrega({ onClose, onSalvar }) {
           </div>
 
           <div className="p-6 overflow-y-auto space-y-6">
+            {carregandoDados && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                Carregando funcionários, EPIs e tamanhos...
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <label className="block text-sm font-medium text-slate-700">
@@ -766,10 +925,11 @@ function ModalEntrega({ onClose, onSalvar }) {
                           type="button"
                           key={f.id}
                           onClick={() => setFuncionario(f.id)}
-                          className={`w-full text-left p-2.5 border-b border-gray-50 last:border-0 transition-colors ${isSelected
-                            ? "bg-blue-100 text-blue-800 font-medium"
-                            : "text-slate-600 hover:bg-blue-50"
-                            }`}
+                          className={`w-full text-left p-2.5 border-b border-gray-50 last:border-0 transition-colors ${
+                            isSelected
+                              ? "bg-blue-100 text-blue-800 font-medium"
+                              : "text-slate-600 hover:bg-blue-50"
+                          }`}
                         >
                           <span className="font-mono text-xs text-slate-400 mr-2">
                             [{f.matricula}]
@@ -1000,6 +1160,7 @@ function ModalEntrega({ onClose, onSalvar }) {
 
           <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
             <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition"
             >
@@ -1007,11 +1168,13 @@ function ModalEntrega({ onClose, onSalvar }) {
             </button>
 
             <button
+              type="button"
               onClick={salvarEntrega}
               disabled={carregando}
               className="px-6 py-2 bg-blue-700 text-white font-bold rounded-lg hover:bg-blue-800 shadow-md transition flex items-center gap-2 disabled:opacity-60"
             >
-              <span>💾</span> Confirmar Entrega
+              <span>💾</span>
+              {carregando ? "Salvando..." : "Confirmar Entrega"}
             </button>
           </div>
         </div>
@@ -1056,7 +1219,7 @@ function ModalEntrega({ onClose, onSalvar }) {
                     onPointerUp={finishDrawing}
                     onPointerLeave={finishDrawing}
                     onPointerCancel={finishDrawing}
-                    className="block w-full h-full touch-none bg-blue"
+                    className="block w-full h-full touch-none bg-white"
                   />
 
                   <div className="absolute top-4 left-4 pointer-events-none">

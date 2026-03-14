@@ -50,7 +50,7 @@ async function buscarPrimeiraLista(rotas, fallback = []) {
       const lista = extrairLista(resp, fallback);
       if (Array.isArray(lista)) return lista;
     } catch (erro) {
-      // tenta próxima
+      // tenta próxima rota
     }
   }
   return fallback;
@@ -81,7 +81,7 @@ function normalizarTamanho(item) {
 function normalizarMotivo(item) {
   return {
     id: Number(item?.id ?? 0),
-    nome: item?.nome ?? "",
+    nome: item?.nome ?? item?.descricao ?? "",
   };
 }
 
@@ -200,6 +200,17 @@ function gerarAssinaturaAjustada(canvasOriginal) {
   return canvasFinal.toDataURL("image/png");
 }
 
+async function salvarEmAlgumaRota(rotas, payload) {
+  for (const rota of rotas) {
+    try {
+      return await api.post(rota, payload);
+    } catch (erro) {
+      // tenta próxima rota
+    }
+  }
+  throw new Error("Nenhuma rota de devolução disponível.");
+}
+
 function ModalBaixa({ onClose, onSalvar }) {
   const [funcionarios, setFuncionarios] = useState([]);
   const [epis, setEpis] = useState([]);
@@ -260,7 +271,12 @@ function ModalBaixa({ onClose, onSalvar }) {
           buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
           buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
           buscarPrimeiraLista(
-            ["/motivos-devolucao", "/motivo-devolucao", "/motivos_baixa", "/motivos"],
+            [
+              "/motivos-devolucao",
+              "/motivo-devolucao",
+              "/motivos_baixa",
+              "/motivos",
+            ],
             mockMotivos
           ),
         ]);
@@ -370,7 +386,9 @@ function ModalBaixa({ onClose, onSalvar }) {
   }, [funcionarios, buscaFuncionario]);
 
   const funcionarioSelecionado = useMemo(() => {
-    return funcionarios.find((f) => Number(f.id) === Number(idFuncionario)) || null;
+    return (
+      funcionarios.find((f) => Number(f.id) === Number(idFuncionario)) || null
+    );
   }, [funcionarios, idFuncionario]);
 
   const epiSelecionado = useMemo(() => {
@@ -386,7 +404,9 @@ function ModalBaixa({ onClose, onSalvar }) {
   }, [epis, idEpiNovo]);
 
   const tamanhoNovoSelecionado = useMemo(() => {
-    return tamanhos.find((t) => Number(t.id) === Number(idTamanhoNovo)) || null;
+    return (
+      tamanhos.find((t) => Number(t.id) === Number(idTamanhoNovo)) || null
+    );
   }, [tamanhos, idTamanhoNovo]);
 
   const motivoSelecionado = useMemo(() => {
@@ -553,9 +573,7 @@ function ModalBaixa({ onClose, onSalvar }) {
     const assinaturaImagem = assinaturaPreview;
     const tokenValidacao = gerarTokenValidacao();
 
-    const devolucaoFinal = {
-      id: Date.now(),
-
+    const payload = {
       idFuncionario: Number(idFuncionario),
       idEpi: Number(idEpi),
       idMotivo: Number(idMotivo),
@@ -567,8 +585,12 @@ function ModalBaixa({ onClose, onSalvar }) {
       quantidadeNova: houveTroca ? Number(quantidadeNova) : null,
       assinatura_digital: assinaturaImagem,
       token_validacao: tokenValidacao,
-      observacao: observacao || null,
+      observacao: observacao?.trim() || null,
+    };
 
+    const devolucaoFinal = {
+      id: Date.now(),
+      ...payload,
       funcionario: Number(idFuncionario),
       epi: Number(idEpi),
       motivo: motivoSelecionado?.nome || "",
@@ -587,37 +609,24 @@ function ModalBaixa({ onClose, onSalvar }) {
       nome_epi_novo: epiNovoSelecionado?.nome || "",
     };
 
-    let salvouNoServidor = false;
-
     try {
-      await api.post("/devolucao", devolucaoFinal);
-      salvouNoServidor = true;
-    } catch (erro) {
       try {
-        await api.post("/devolucoes", devolucaoFinal);
-        salvouNoServidor = true;
-      } catch (erro2) {
-        try {
-          await api.post("/baixa", devolucaoFinal);
-          salvouNoServidor = true;
-        } catch (erro3) {
-          salvouNoServidor = false;
-        }
+        await salvarEmAlgumaRota(
+          ["/devolucao", "/devolucoes", "/baixa"],
+          payload
+        );
+      } catch (erro) {
+        // fallback local
       }
-    }
 
-    if (onSalvar) {
-      onSalvar(devolucaoFinal);
-    }
+      if (onSalvar) {
+        await onSalvar(devolucaoFinal);
+      }
 
-    if (!salvouNoServidor) {
-      alert(
-        "Não foi possível salvar no servidor. O registro foi mantido localmente nesta sessão."
-      );
+      onClose();
+    } finally {
+      setCarregando(false);
     }
-
-    onClose();
-    setCarregando(false);
   }
 
   function renderBotoesSidebarMobile() {
@@ -760,12 +769,17 @@ function ModalBaixa({ onClose, onSalvar }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden animate-fade-in flex flex-col max-h-[95vh]">
           <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <span className="bg-red-100 p-2 rounded-lg text-red-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -786,6 +800,7 @@ function ModalBaixa({ onClose, onSalvar }) {
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="text-red-400 hover:text-red-600 transition text-xl font-bold"
             >
@@ -821,7 +836,8 @@ function ModalBaixa({ onClose, onSalvar }) {
                     </div>
                   ) : (
                     funcionariosFiltrados.map((f) => {
-                      const selecionado = Number(idFuncionario) === Number(f.id);
+                      const selecionado =
+                        Number(idFuncionario) === Number(f.id);
 
                       return (
                         <button
@@ -1009,6 +1025,14 @@ function ModalBaixa({ onClose, onSalvar }) {
                     />
                   </div>
                 </div>
+
+                {(epiNovoSelecionado || tamanhoNovoSelecionado) && (
+                  <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    Novo item: <b>{epiNovoSelecionado?.nome || "-"}</b> — Tam.{" "}
+                    {tamanhoNovoSelecionado?.tamanho || "-"} — Qtd.{" "}
+                    {quantidadeNova || 0}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1106,6 +1130,7 @@ function ModalBaixa({ onClose, onSalvar }) {
 
           <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t shrink-0">
             <button
+              type="button"
               onClick={onClose}
               disabled={carregando}
               className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition"
@@ -1114,10 +1139,13 @@ function ModalBaixa({ onClose, onSalvar }) {
             </button>
 
             <button
+              type="button"
               onClick={salvarBaixa}
               disabled={carregando}
               className={`px-4 py-2 text-white font-bold rounded-lg shadow-md transition flex items-center gap-2 ${
-                carregando ? "bg-red-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                carregando
+                  ? "bg-red-400 cursor-not-allowed"
+                  : "bg-red-600 hover:bg-red-700"
               }`}
             >
               <span>{carregando ? "⏳" : "💾"}</span>

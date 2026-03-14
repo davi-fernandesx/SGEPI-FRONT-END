@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
+import { temPermissao } from "../utils/permissoes";
 
 const mockFornecedores = [
   {
@@ -105,8 +106,8 @@ async function buscarPrimeiraLista(rotas, fallback) {
 
 function normalizarFornecedor(item) {
   return {
-    id: Number(item?.id ?? 0),
-    razao_social: item?.razao_social ?? item?.razaoSocial ?? "",
+    id: Number(item?.id ?? item?.ID ?? 0),
+    razao_social: item?.razao_social ?? item?.razaoSocial ?? item?.nome ?? "",
     nome_fantasia: item?.nome_fantasia ?? item?.nomeFantasia ?? "",
     cnpj: item?.cnpj ?? "",
     inscricao_estadual:
@@ -116,8 +117,8 @@ function normalizarFornecedor(item) {
 
 function normalizarEpi(item) {
   return {
-    id: Number(item?.id ?? 0),
-    nome: item?.nome ?? "",
+    id: Number(item?.id ?? item?.ID ?? 0),
+    nome: item?.nome ?? item?.Nome ?? "",
     fabricante: item?.fabricante ?? "",
     CA: item?.CA ?? item?.ca ?? "",
   };
@@ -125,14 +126,14 @@ function normalizarEpi(item) {
 
 function normalizarTamanho(item) {
   return {
-    id: Number(item?.id ?? 0),
-    tamanho: String(item?.tamanho ?? ""),
+    id: Number(item?.id ?? item?.ID ?? 0),
+    tamanho: String(item?.tamanho ?? item?.Tamanho ?? ""),
   };
 }
 
 function normalizarEntrada(item) {
   return {
-    id: Number(item?.id ?? 0),
+    id: Number(item?.id ?? item?.ID ?? 0),
     idEpi: Number(
       item?.idEpi ??
         item?.epi_id ??
@@ -140,6 +141,8 @@ function normalizarEntrada(item) {
         item?.id_epi ??
         item?.idProduto ??
         item?.produto_id ??
+        item?.produto?.id ??
+        item?.epi?.id ??
         0
     ),
     idTamanho: Number(
@@ -147,6 +150,7 @@ function normalizarEntrada(item) {
         item?.tamanho_id ??
         item?.tamanhoId ??
         item?.id_tamanho ??
+        item?.tamanho?.id ??
         0
     ),
     idFornecedor: Number(
@@ -154,6 +158,7 @@ function normalizarEntrada(item) {
         item?.fornecedor_id ??
         item?.fornecedorId ??
         item?.id_fornecedor ??
+        item?.fornecedor?.id ??
         0
     ),
     data_entrada: item?.data_entrada ?? item?.dataEntrada ?? "",
@@ -167,7 +172,8 @@ function normalizarEntrada(item) {
         0
     ),
     data_fabricacao: item?.data_fabricacao ?? item?.dataFabricacao ?? "",
-    data_validade: item?.data_validade ?? item?.dataValidade ?? item?.validade ?? "",
+    data_validade:
+      item?.data_validade ?? item?.dataValidade ?? item?.validade ?? "",
     lote: item?.lote ?? "",
     valor_unitario: Number(item?.valor_unitario ?? item?.valorUnitario ?? 0),
     nota_fiscal_numero:
@@ -177,11 +183,14 @@ function normalizarEntrada(item) {
   };
 }
 
-function Entradas() {
+function Entradas({ usuarioLogado }) {
   const [entradas, setEntradas] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [epis, setEpis] = useState([]);
   const [tamanhos, setTamanhos] = useState([]);
+
+  const [carregandoTela, setCarregandoTela] = useState(true);
+  const [erroTela, setErroTela] = useState("");
 
   const [modalAberto, setModalAberto] = useState(false);
   const [busca, setBusca] = useState("");
@@ -201,7 +210,19 @@ function Entradas() {
   const [notaFiscalSerie, setNotaFiscalSerie] = useState("");
   const [carregando, setCarregando] = useState(false);
 
+  const podeVisualizar = !usuarioLogado
+    ? true
+    : temPermissao(usuarioLogado, "visualizar_estoque");
+
+  const perfilUsuario = usuarioLogado?.perfil || usuarioLogado?.role || "";
+  const podeCadastrar = !usuarioLogado
+    ? true
+    : perfilUsuario === "admin" || perfilUsuario === "gerente";
+
   const carregarEntradas = async () => {
+    setCarregandoTela(true);
+    setErroTela("");
+
     try {
       const [listaFornecedores, listaEpis, listaTamanhos, listaEntradas] =
         await Promise.all([
@@ -219,10 +240,16 @@ function Entradas() {
       setTamanhos(listaTamanhos.map(normalizarTamanho));
       setEntradas(listaEntradas.map(normalizarEntrada));
     } catch (erro) {
+      console.error("Erro ao carregar entradas:", erro);
+      setErroTela(
+        erro?.message || "Não foi possível carregar os registros de entrada."
+      );
       setFornecedores(mockFornecedores.map(normalizarFornecedor));
       setEpis(mockEpis.map(normalizarEpi));
       setTamanhos(mockTamanhos.map(normalizarTamanho));
       setEntradas(mockEntradasInicial.map(normalizarEntrada));
+    } finally {
+      setCarregandoTela(false);
     }
   };
 
@@ -232,6 +259,13 @@ function Entradas() {
 
   const formatarData = (data) => {
     if (!data) return "--";
+    const texto = String(data).substring(0, 10);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+      const [ano, mes, dia] = texto.split("-");
+      return `${dia}/${mes}/${ano}`;
+    }
+
     const dataObj = new Date(data);
     if (Number.isNaN(dataObj.getTime())) return "--";
     return dataObj.toLocaleDateString("pt-BR");
@@ -295,6 +329,21 @@ function Entradas() {
     });
   }, [entradasFiltradas]);
 
+  const resumoTela = useMemo(() => {
+    return {
+      totalRegistros: entradasOrdenadas.length,
+      totalItens: entradasOrdenadas.reduce(
+        (acc, item) => acc + Number(item.quantidade || 0),
+        0
+      ),
+      valorTotal: entradasOrdenadas.reduce(
+        (acc, item) =>
+          acc + Number(item.quantidade || 0) * Number(item.valor_unitario || 0),
+        0
+      ),
+    };
+  }, [entradasOrdenadas]);
+
   useEffect(() => {
     const total = Math.max(1, Math.ceil(entradasOrdenadas.length / itensPorPagina));
     if (paginaAtual > total) setPaginaAtual(total);
@@ -305,7 +354,7 @@ function Entradas() {
   const entradasVisiveis = entradasOrdenadas.slice(indexPrimeiroItem, indexUltimoItem);
   const totalPaginas = Math.max(1, Math.ceil(entradasOrdenadas.length / itensPorPagina));
 
-  function abrirModal() {
+  function resetarFormulario() {
     setIdFornecedor("");
     setIdEpi("");
     setIdTamanho("");
@@ -317,12 +366,34 @@ function Entradas() {
     setValorUnitario("");
     setNotaFiscalNumero("");
     setNotaFiscalSerie("");
+  }
+
+  function abrirModal() {
+    resetarFormulario();
     setModalAberto(true);
+  }
+
+  function fecharModal() {
+    if (carregando) return;
+    setModalAberto(false);
   }
 
   const salvarEntrada = async () => {
     if (!idFornecedor || !idEpi || !idTamanho || !quantidade || !dataEntrada) {
       alert("Preencha os campos obrigatórios.");
+      return;
+    }
+
+    const qtd = Number(quantidade);
+    const valor = Number(valorUnitario || 0);
+
+    if (Number.isNaN(qtd) || qtd <= 0) {
+      alert("Informe uma quantidade válida.");
+      return;
+    }
+
+    if (Number.isNaN(valor) || valor < 0) {
+      alert("Informe um valor unitário válido.");
       return;
     }
 
@@ -332,40 +403,64 @@ function Entradas() {
       idFornecedor: Number(idFornecedor),
       idEpi: Number(idEpi),
       idTamanho: Number(idTamanho),
-      quantidade: Number(quantidade),
-      quantidadeAtual: Number(quantidade),
+      quantidade: qtd,
+      quantidadeAtual: qtd,
       data_entrada: dataEntrada,
       data_fabricacao: dataFabricacao || null,
       data_validade: dataValidade || null,
-      lote,
-      valor_unitario: Number(valorUnitario || 0),
-      nota_fiscal_numero: notaFiscalNumero,
-      nota_fiscal_serie: notaFiscalSerie,
+      lote: lote.trim(),
+      valor_unitario: valor,
+      nota_fiscal_numero: notaFiscalNumero.trim(),
+      nota_fiscal_serie: notaFiscalSerie.trim(),
     };
 
+    let salvouNoServidor = false;
+
     try {
-      await api.post("/entrada-epi", pacoteDados);
-      const novaEntrada = { id: Date.now(), ...pacoteDados };
-      setEntradas((prev) => [novaEntrada, ...prev]);
+      try {
+        await api.post("/entrada-epi", pacoteDados);
+        salvouNoServidor = true;
+      } catch (erro) {
+        try {
+          await api.post("/entrada_epi", pacoteDados);
+          salvouNoServidor = true;
+        } catch (erro2) {
+          try {
+            await api.post("/entradas", pacoteDados);
+            salvouNoServidor = true;
+          } catch (erro3) {
+            salvouNoServidor = false;
+          }
+        }
+      }
+
+      if (salvouNoServidor) {
+        await carregarEntradas();
+      } else {
+        const novaEntrada = normalizarEntrada({
+          id: Date.now(),
+          ...pacoteDados,
+        });
+
+        setEntradas((prev) => [novaEntrada, ...prev]);
+      }
+
       setModalAberto(false);
       setPaginaAtual(1);
-    } catch (erro) {
-      try {
-        await api.post("/entrada_epi", pacoteDados);
-        const novaEntrada = { id: Date.now(), ...pacoteDados };
-        setEntradas((prev) => [novaEntrada, ...prev]);
-        setModalAberto(false);
-        setPaginaAtual(1);
-      } catch (erro2) {
-        const novaEntrada = { id: Date.now(), ...pacoteDados };
-        setEntradas((prev) => [novaEntrada, ...prev]);
-        setModalAberto(false);
-        setPaginaAtual(1);
-      }
     } finally {
       setCarregando(false);
     }
   };
+
+  if (!podeVisualizar) {
+    return (
+      <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-amber-700">
+          Você não tem permissão para visualizar a tela de entradas.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
@@ -379,13 +474,50 @@ function Entradas() {
           </p>
         </div>
 
-        <button
-          onClick={abrirModal}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition flex items-center gap-2 shadow-sm justify-center w-full lg:w-auto"
-        >
-          <span>➕</span> Nova Entrada
-        </button>
+        {podeCadastrar && (
+          <button
+            onClick={abrirModal}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition flex items-center gap-2 shadow-sm justify-center w-full lg:w-auto"
+          >
+            <span>➕</span> Nova Entrada
+          </button>
+        )}
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+          <span className="text-[11px] text-emerald-700 uppercase font-bold tracking-wide block mb-1">
+            Registros visíveis
+          </span>
+          <strong className="text-2xl text-emerald-900">
+            {carregandoTela ? "--" : resumoTela.totalRegistros}
+          </strong>
+        </div>
+
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+          <span className="text-[11px] text-blue-700 uppercase font-bold tracking-wide block mb-1">
+            Quantidade total
+          </span>
+          <strong className="text-2xl text-blue-900">
+            {carregandoTela ? "--" : resumoTela.totalItens}
+          </strong>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <span className="text-[11px] text-gray-600 uppercase font-bold tracking-wide block mb-1">
+            Valor total
+          </span>
+          <strong className="text-2xl text-gray-900">
+            {carregandoTela ? "--" : formatarMoeda(resumoTela.valorTotal)}
+          </strong>
+        </div>
+      </div>
+
+      {erroTela && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          {erroTela}
+        </div>
+      )}
 
       <div className="relative mb-6">
         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -403,167 +535,196 @@ function Entradas() {
         />
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-            <tr>
-              <th className="p-4 font-semibold">Data</th>
-              <th className="p-4 font-semibold">EPI / Item</th>
-              <th className="p-4 font-semibold text-center">Tam.</th>
-              <th className="p-4 font-semibold text-center">Qtd.</th>
-              <th className="p-4 font-semibold">Fornecedor / Lote</th>
-              <th className="p-4 font-semibold">NF</th>
-              <th className="p-4 font-semibold text-right">Valor Un.</th>
-              <th className="p-4 font-semibold text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {entradasVisiveis.length === 0 ? (
-              <tr>
-                <td colSpan="8" className="p-8 text-center text-gray-500">
-                  Nenhuma entrada encontrada.
-                </td>
-              </tr>
-            ) : (
-              entradasVisiveis.map((e) => {
-                const total = Number(e.quantidade || 0) * Number(e.valor_unitario || 0);
+      {carregandoTela ? (
+        <div className="border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500">
+          Carregando entradas...
+        </div>
+      ) : (
+        <>
+          <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                <tr>
+                  <th className="p-4 font-semibold">Data</th>
+                  <th className="p-4 font-semibold">EPI / Item</th>
+                  <th className="p-4 font-semibold text-center">Tam.</th>
+                  <th className="p-4 font-semibold text-center">Qtd.</th>
+                  <th className="p-4 font-semibold">Fornecedor / Lote</th>
+                  <th className="p-4 font-semibold">NF</th>
+                  <th className="p-4 font-semibold text-right">Valor Un.</th>
+                  <th className="p-4 font-semibold text-right">Total</th>
+                </tr>
+              </thead>
 
-                return (
-                  <tr key={e.id} className="hover:bg-gray-50 transition">
-                    <td className="p-4 text-gray-600 font-mono text-sm">
-                      {formatarData(e.data_entrada)}
-                    </td>
-
-                    <td className="p-4">
-                      <div className="font-medium text-gray-800">{e.epiNome}</div>
-                      <div className="text-xs text-gray-400">
-                        {e.epiFabricante || "-"} • CA: {e.epiCA || "-"}
-                      </div>
-                    </td>
-
-                    <td className="p-4 text-center text-gray-600">{e.tamanhoNome || "-"}</td>
-
-                    <td className="p-4 text-center">
-                      <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded">
-                        +{e.quantidade}
-                      </span>
-                    </td>
-
-                    <td className="p-4 text-gray-600 text-sm">
-                      <div className="font-bold">{e.fornecedorNome}</div>
-                      <div className="text-xs text-gray-400">Lote: {e.lote || "-"}</div>
-                    </td>
-
-                    <td className="p-4 text-gray-600 text-sm">
-                      Nº {e.nota_fiscal_numero || "-"} / Série {e.nota_fiscal_serie || "-"}
-                    </td>
-
-                    <td className="p-4 text-right text-gray-600 font-mono text-sm">
-                      {formatarMoeda(e.valor_unitario)}
-                    </td>
-
-                    <td className="p-4 text-right text-emerald-700 font-bold font-mono text-sm">
-                      {formatarMoeda(total)}
+              <tbody className="divide-y divide-gray-200">
+                {entradasVisiveis.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="p-8 text-center text-gray-500">
+                      Nenhuma entrada encontrada.
                     </td>
                   </tr>
+                ) : (
+                  entradasVisiveis.map((e) => {
+                    const total =
+                      Number(e.quantidade || 0) * Number(e.valor_unitario || 0);
+
+                    return (
+                      <tr key={e.id} className="hover:bg-gray-50 transition">
+                        <td className="p-4 text-gray-600 font-mono text-sm">
+                          {formatarData(e.data_entrada)}
+                        </td>
+
+                        <td className="p-4">
+                          <div className="font-medium text-gray-800">{e.epiNome}</div>
+                          <div className="text-xs text-gray-400">
+                            {e.epiFabricante || "-"} • CA: {e.epiCA || "-"}
+                          </div>
+                        </td>
+
+                        <td className="p-4 text-center text-gray-600">
+                          {e.tamanhoNome || "-"}
+                        </td>
+
+                        <td className="p-4 text-center">
+                          <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded">
+                            +{e.quantidade}
+                          </span>
+                        </td>
+
+                        <td className="p-4 text-gray-600 text-sm">
+                          <div className="font-bold">{e.fornecedorNome}</div>
+                          <div className="text-xs text-gray-400">
+                            Lote: {e.lote || "-"}
+                          </div>
+                        </td>
+
+                        <td className="p-4 text-gray-600 text-sm">
+                          Nº {e.nota_fiscal_numero || "-"} / Série{" "}
+                          {e.nota_fiscal_serie || "-"}
+                        </td>
+
+                        <td className="p-4 text-right text-gray-600 font-mono text-sm">
+                          {formatarMoeda(e.valor_unitario)}
+                        </td>
+
+                        <td className="p-4 text-right text-emerald-700 font-bold font-mono text-sm">
+                          {formatarMoeda(total)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="lg:hidden space-y-4">
+            {entradasVisiveis.length > 0 ? (
+              entradasVisiveis.map((e) => {
+                const total =
+                  Number(e.quantidade || 0) * Number(e.valor_unitario || 0);
+
+                return (
+                  <div
+                    key={e.id}
+                    className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                        {formatarData(e.data_entrada)}
+                      </span>
+
+                      <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200">
+                        +{e.quantidade} un
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-gray-800 text-lg mb-1">
+                      {e.epiNome}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Tamanho:{" "}
+                      <strong className="text-gray-800">
+                        {e.tamanhoNome || "Único"}
+                      </strong>
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
+                      <div>
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                          Fornecedor
+                        </span>
+                        <span className="text-gray-700 font-medium truncate block">
+                          {e.fornecedorNome}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          Lote: {e.lote || "-"}
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                          Total da NF
+                        </span>
+                        <span className="text-emerald-700 font-bold font-mono">
+                          {formatarMoeda(total)}
+                        </span>
+                      </div>
+
+                      <div className="col-span-2 pt-2 border-t border-gray-200">
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                          Nota Fiscal
+                        </span>
+                        <span className="text-gray-700">
+                          Nº {e.nota_fiscal_numero || "-"} / Série{" "}
+                          {e.nota_fiscal_serie || "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 );
               })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="lg:hidden space-y-4">
-        {entradasVisiveis.length > 0 ? (
-          entradasVisiveis.map((e) => {
-            const total = Number(e.quantidade || 0) * Number(e.valor_unitario || 0);
-
-            return (
-              <div key={e.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                    {formatarData(e.data_entrada)}
-                  </span>
-
-                  <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200">
-                    +{e.quantidade} un
-                  </span>
-                </div>
-
-                <h3 className="font-bold text-gray-800 text-lg mb-1">{e.epiNome}</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  Tamanho: <strong className="text-gray-800">{e.tamanhoNome || "Único"}</strong>
-                </p>
-
-                <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
-                  <div>
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                      Fornecedor
-                    </span>
-                    <span className="text-gray-700 font-medium truncate block">
-                      {e.fornecedorNome}
-                    </span>
-                    <span className="text-xs text-gray-400">Lote: {e.lote || "-"}</span>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                      Total da NF
-                    </span>
-                    <span className="text-emerald-700 font-bold font-mono">
-                      {formatarMoeda(total)}
-                    </span>
-                  </div>
-
-                  <div className="col-span-2 pt-2 border-t border-gray-200">
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                      Nota Fiscal
-                    </span>
-                    <span className="text-gray-700">
-                      Nº {e.nota_fiscal_numero || "-"} / Série {e.nota_fiscal_serie || "-"}
-                    </span>
-                  </div>
-                </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                Nenhuma entrada encontrada.
               </div>
-            );
-          })
-        ) : (
-          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-            Nenhuma entrada encontrada.
+            )}
           </div>
-        )}
-      </div>
 
-      {totalPaginas > 1 && (
-        <div className="flex justify-between items-center mt-6 px-1">
-          <button
-            onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
-            disabled={paginaAtual === 1}
-            className={`px-4 py-2 rounded text-sm font-bold border ${
-              paginaAtual === 1
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-            }`}
-          >
-            ← Anterior
-          </button>
+          {totalPaginas > 1 && (
+            <div className="flex justify-between items-center mt-6 px-1">
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                disabled={paginaAtual === 1}
+                className={`px-4 py-2 rounded text-sm font-bold border ${
+                  paginaAtual === 1
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                }`}
+              >
+                ← Anterior
+              </button>
 
-          <span className="text-xs lg:text-sm text-gray-600">
-            Pág. <b className="text-gray-900">{paginaAtual}</b> de <b>{totalPaginas}</b>
-          </span>
+              <span className="text-xs lg:text-sm text-gray-600">
+                Pág. <b className="text-gray-900">{paginaAtual}</b> de <b>{totalPaginas}</b>
+              </span>
 
-          <button
-            onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
-            disabled={paginaAtual === totalPaginas}
-            className={`px-4 py-2 rounded text-sm font-bold border ${
-              paginaAtual === totalPaginas
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-            }`}
-          >
-            Próxima →
-          </button>
-        </div>
+              <button
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+                }
+                disabled={paginaAtual === totalPaginas}
+                className={`px-4 py-2 rounded text-sm font-bold border ${
+                  paginaAtual === totalPaginas
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                }`}
+              >
+                Próxima →
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {modalAberto && (
@@ -572,7 +733,7 @@ function Entradas() {
             <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center shrink-0">
               <h3 className="text-lg font-bold text-gray-800">📦 Nova Entrada</h3>
               <button
-                onClick={() => setModalAberto(false)}
+                onClick={fecharModal}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl"
               >
                 ✕
@@ -622,6 +783,7 @@ function Entradas() {
                 </label>
                 <input
                   type="number"
+                  min="1"
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                   placeholder="Ex: 50"
                   value={quantidade}
@@ -647,6 +809,7 @@ function Entradas() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   step="0.01"
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                   placeholder="0.00"
@@ -739,9 +902,9 @@ function Entradas() {
 
             <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t shrink-0">
               <button
-                onClick={() => setModalAberto(false)}
+                onClick={fecharModal}
                 disabled={carregando}
-                className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition"
+                className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition disabled:opacity-60"
               >
                 Cancelar
               </button>
@@ -755,7 +918,7 @@ function Entradas() {
                     : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
               >
-                {carregando ? "A registar..." : "Registrar"}
+                {carregando ? "Registrando..." : "Registrar"}
               </button>
             </div>
           </div>

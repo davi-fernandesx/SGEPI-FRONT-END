@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ModalBaixa from "../components/modals/ModalBaixa";
 import { api } from "../services/api";
+import { temPermissao } from "../utils/permissoes";
 
 const mockFuncionarios = [
   { id: 1, nome: "João Silva", matricula: "483920" },
@@ -160,11 +161,7 @@ function normalizarDevolucao(item) {
         0
     ),
 
-    data_devolucao:
-      item?.data_devolucao ??
-      item?.dataDevolucao ??
-      item?.data ??
-      "",
+    data_devolucao: item?.data_devolucao ?? item?.dataDevolucao ?? item?.data ?? "",
 
     idTamanho: Number(
       item?.idTamanho ??
@@ -209,27 +206,29 @@ function normalizarDevolucao(item) {
       item?.assinatura ??
       null,
 
-    token_validacao:
-      item?.token_validacao ??
-      item?.tokenValidacao ??
-      null,
+    token_validacao: item?.token_validacao ?? item?.tokenValidacao ?? null,
+
+    observacao: item?.observacao ?? item?.observacoes ?? item?.obs ?? "",
 
     motivoTextoFallback:
-      typeof item?.motivo === "string"
-        ? item.motivo
-        : item?.motivo?.nome || "",
+      typeof item?.motivo === "string" ? item.motivo : item?.motivo?.nome || "",
 
-    tamanhoTextoFallback:
-      typeof item?.tamanho === "string"
-        ? item.tamanho
-        : "",
+    tamanhoTextoFallback: typeof item?.tamanho === "string" ? item.tamanho : "",
 
     novoTamanhoTextoFallback:
-      trocaLegada?.novoTamanho ??
-      item?.novoTamanho ??
+      trocaLegada?.novoTamanho ?? item?.novoTamanho ?? "",
+
+    nomeFuncionarioFallback:
+      item?.nome_funcionario ??
+      item?.funcionarioNome ??
+      item?.funcionario?.nome ??
       "",
 
-    trocaLegada: trocaLegada,
+    nomeEpiFallback: item?.nome_epi ?? item?.epiNome ?? item?.epi?.nome ?? "",
+    nomeEpiNovoFallback:
+      item?.nome_epi_novo ?? item?.epiNovoNome ?? item?.epiNovo?.nome ?? "",
+
+    trocaLegada,
   };
 }
 
@@ -346,7 +345,9 @@ function ModalPeriodoRelatorioDevolucao({
 
   const subtitulo =
     tipo === "funcionario"
-      ? `Escolha o intervalo de devoluções para ${funcionario?.nome || "o funcionário"}`
+      ? `Escolha o intervalo de devoluções para ${
+          funcionario?.nome || "o funcionário"
+        }`
       : "Escolha o intervalo para imprimir o relatório geral de devoluções";
 
   return (
@@ -480,14 +481,18 @@ function ModalPeriodoRelatorioDevolucao({
               <span className="text-[11px] uppercase tracking-wide text-gray-500 font-bold block mb-1">
                 Devoluções encontradas
               </span>
-              <strong className="text-2xl text-red-700">{resumo.totalDevolucoes}</strong>
+              <strong className="text-2xl text-red-700">
+                {resumo.totalDevolucoes}
+              </strong>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
               <span className="text-[11px] uppercase tracking-wide text-gray-500 font-bold block mb-1">
                 Trocas no período
               </span>
-              <strong className="text-2xl text-emerald-700">{resumo.totalTrocas}</strong>
+              <strong className="text-2xl text-emerald-700">
+                {resumo.totalTrocas}
+              </strong>
             </div>
           </div>
 
@@ -524,12 +529,15 @@ function ModalPeriodoRelatorioDevolucao({
   );
 }
 
-function Devolucoes() {
+function Devolucoes({ usuarioLogado }) {
   const [devolucoes, setDevolucoes] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
   const [epis, setEpis] = useState([]);
   const [tamanhos, setTamanhos] = useState([]);
   const [motivos, setMotivos] = useState([]);
+
+  const [carregandoTela, setCarregandoTela] = useState(true);
+  const [erroTela, setErroTela] = useState("");
 
   const [modalAberto, setModalAberto] = useState(false);
 
@@ -547,7 +555,19 @@ function Devolucoes() {
 
   const itensPorPagina = 5;
 
+  const podeVisualizar = !usuarioLogado
+    ? true
+    : temPermissao(usuarioLogado, "visualizar_estoque");
+
+  const perfilUsuario = usuarioLogado?.perfil || usuarioLogado?.role || "";
+  const podeCadastrar = !usuarioLogado
+    ? true
+    : perfilUsuario === "admin" || perfilUsuario === "gerente";
+
   const carregarDevolucoes = async () => {
+    setCarregandoTela(true);
+    setErroTela("");
+
     try {
       const [
         listaFuncionarios,
@@ -560,10 +580,18 @@ function Devolucoes() {
         buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
         buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
         buscarPrimeiraLista(
-          ["/motivos-devolucao", "/motivo-devolucao", "/motivos-devolucao", "/motivos"],
+          [
+            "/motivos-devolucao",
+            "/motivo-devolucao",
+            "/motivos_baixa",
+            "/motivos",
+          ],
           mockMotivos
         ),
-        buscarPrimeiraLista(["/devolucoes", "/devolucao"], mockDevolucoesInicial),
+        buscarPrimeiraLista(
+          ["/devolucoes", "/devolucao", "/baixas"],
+          mockDevolucoesInicial
+        ),
       ]);
 
       setFuncionarios(listaFuncionarios.map(normalizarFuncionario));
@@ -572,11 +600,17 @@ function Devolucoes() {
       setMotivos(listaMotivos.map(normalizarMotivo));
       setDevolucoes(listaDevolucoes.map(normalizarDevolucao));
     } catch (erro) {
+      console.error("Erro ao carregar devoluções:", erro);
+      setErroTela(
+        erro?.message || "Não foi possível carregar os registros de devolução."
+      );
       setFuncionarios(mockFuncionarios.map(normalizarFuncionario));
       setEpis(mockEpis.map(normalizarEpi));
       setTamanhos(mockTamanhos.map(normalizarTamanho));
       setMotivos(mockMotivos.map(normalizarMotivo));
       setDevolucoes(mockDevolucoesInicial.map(normalizarDevolucao));
+    } finally {
+      setCarregandoTela(false);
     }
   };
 
@@ -595,12 +629,8 @@ function Devolucoes() {
         (f) => Number(f.id) === Number(d.idFuncionario)
       );
       const epi = epis.find((e) => Number(e.id) === Number(d.idEpi));
-      const tamanho = tamanhos.find(
-        (t) => Number(t.id) === Number(d.idTamanho)
-      );
-      const motivo = motivos.find(
-        (m) => Number(m.id) === Number(d.idMotivo)
-      );
+      const tamanho = tamanhos.find((t) => Number(t.id) === Number(d.idTamanho));
+      const motivo = motivos.find((m) => Number(m.id) === Number(d.idMotivo));
 
       const epiNovo = epis.find((e) => Number(e.id) === Number(d.idEpiNovo));
       const tamanhoNovo = tamanhos.find(
@@ -615,14 +645,18 @@ function Devolucoes() {
 
       return {
         ...d,
-        funcionarioNome: funcionario?.nome || "Desconhecido",
+        funcionarioNome:
+          funcionario?.nome || d.nomeFuncionarioFallback || "Desconhecido",
         funcionarioMatricula: funcionario?.matricula || "--",
-        epiNome: epi?.nome || "EPI não identificado",
+        epiNome: epi?.nome || d.nomeEpiFallback || "EPI não identificado",
         tamanhoNome: tamanho?.tamanho || d.tamanhoTextoFallback || "-",
         motivoNome:
           motivo?.nome || d.motivoTextoFallback || "Motivo não identificado",
         houveTroca,
-        epiNovoNome: epiNovo?.nome || (houveTroca ? "EPI de troca" : null),
+        epiNovoNome:
+          epiNovo?.nome ||
+          d.nomeEpiNovoFallback ||
+          (houveTroca ? "EPI de troca" : null),
         tamanhoNovoNome:
           tamanhoNovo?.tamanho || d.novoTamanhoTextoFallback || "-",
       };
@@ -641,7 +675,8 @@ function Devolucoes() {
         (d.epiNome || "").toLowerCase().includes(termo) ||
         (d.epiNovoNome || "").toLowerCase().includes(termo) ||
         String(d.tamanhoNome || "").toLowerCase().includes(termo) ||
-        String(d.tamanhoNovoNome || "").toLowerCase().includes(termo);
+        String(d.tamanhoNovoNome || "").toLowerCase().includes(termo) ||
+        String(d.observacao || "").toLowerCase().includes(termo);
 
       let matchData = true;
       const data = String(d.data_devolucao || "").substring(0, 10);
@@ -660,6 +695,17 @@ function Devolucoes() {
       return 0;
     });
   }, [devolucoesFiltradas]);
+
+  const resumoTela = useMemo(() => {
+    const totalDevolucoes = devolucoesOrdenadas.length;
+    const totalTrocas = devolucoesOrdenadas.filter((item) => item.houveTroca).length;
+
+    return {
+      totalDevolucoes,
+      totalTrocas,
+      totalSemTroca: totalDevolucoes - totalTrocas,
+    };
+  }, [devolucoesOrdenadas]);
 
   useEffect(() => {
     const total = Math.max(1, Math.ceil(devolucoesOrdenadas.length / itensPorPagina));
@@ -772,11 +818,15 @@ function Devolucoes() {
       registros.length > 0
         ? registros
             .map((d) => {
-              const funcionarioNome = escapeHtml(d.funcionarioNome || "Não identificado");
+              const funcionarioNome = escapeHtml(
+                d.funcionarioNome || "Não identificado"
+              );
               const matricula = escapeHtml(d.funcionarioMatricula || "--");
               const epiNome = escapeHtml(d.epiNome || "EPI não identificado");
               const tamanhoNome = escapeHtml(d.tamanhoNome || "-");
-              const motivoNome = escapeHtml(d.motivoNome || "Motivo não identificado");
+              const motivoNome = escapeHtml(
+                d.motivoNome || "Motivo não identificado"
+              );
               const quantidade = Number(d.quantidadeADevolver || 0);
 
               const trocaHtml = d.houveTroca
@@ -831,9 +881,7 @@ function Devolucoes() {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap');
 
-            * {
-              box-sizing: border-box;
-            }
+            * { box-sizing: border-box; }
 
             body {
               font-family: 'Roboto', sans-serif;
@@ -957,33 +1005,12 @@ function Devolucoes() {
               background: #fafafa;
             }
 
-            .col-data {
-              width: 10%;
-              white-space: nowrap;
-              font-weight: 700;
-              color: #334155;
-            }
-
-            .col-funcionario {
-              width: 20%;
-            }
-
-            .col-item {
-              width: 22%;
-            }
-
-            .col-motivo {
-              width: 18%;
-            }
-
-            .col-troca {
-              width: 20%;
-            }
-
-            .col-assinatura {
-              width: 10%;
-              text-align: center;
-            }
+            .col-data { width: 10%; white-space: nowrap; font-weight: 700; color: #334155; }
+            .col-funcionario { width: 20%; }
+            .col-item { width: 22%; }
+            .col-motivo { width: 18%; }
+            .col-troca { width: 20%; }
+            .col-assinatura { width: 10%; text-align: center; }
 
             .funcionario-nome {
               font-size: 13px;
@@ -1029,9 +1056,7 @@ function Devolucoes() {
               border: 1px solid #cbd5e1;
             }
 
-            .troca-box {
-              display: block;
-            }
+            .troca-box { display: block; }
 
             .troca-detalhe {
               margin-top: 8px;
@@ -1088,17 +1113,9 @@ function Devolucoes() {
             }
 
             @media print {
-              body {
-                padding: 18px;
-              }
-
-              .topbar {
-                break-inside: avoid;
-              }
-
-              table, tr, td, th {
-                break-inside: avoid;
-              }
+              body { padding: 18px; }
+              .topbar { break-inside: avoid; }
+              table, tr, td, th { break-inside: avoid; }
             }
           </style>
         </head>
@@ -1212,80 +1229,32 @@ function Devolucoes() {
     resetarModalPeriodo();
   };
 
-  const receberNovaDevolucao = async (novaDevolucao) => {
-    const payload = {
-      idFuncionario: Number(
-        novaDevolucao?.idFuncionario ?? novaDevolucao?.funcionario ?? 0
-      ),
-      idEpi: Number(novaDevolucao?.idEpi ?? novaDevolucao?.epi ?? 0),
-      idMotivo: Number(
-        novaDevolucao?.idMotivo ??
-          novaDevolucao?.motivo_id ??
-          novaDevolucao?.motivoId ??
-          0
-      ),
-      data_devolucao:
-        novaDevolucao?.data_devolucao ??
-        novaDevolucao?.dataDevolucao ??
-        novaDevolucao?.data ??
-        new Date().toISOString().split("T")[0],
-      idTamanho: Number(
-        novaDevolucao?.idTamanho ??
-          novaDevolucao?.tamanho_id ??
-          novaDevolucao?.tamanhoId ??
-          0
-      ),
-      quantidadeADevolver: Number(
-        novaDevolucao?.quantidadeADevolver ??
-          novaDevolucao?.quantidade ??
-          0
-      ),
-      idEpiNovo:
-        Number(novaDevolucao?.idEpiNovo ?? novaDevolucao?.troca?.novoEpi ?? 0) ||
-        null,
-      idTamanhoNovo:
-        Number(novaDevolucao?.idTamanhoNovo ?? novaDevolucao?.tamanhoNovoId ?? 0) ||
-        null,
-      quantidadeNova:
-        Number(
-          novaDevolucao?.quantidadeNova ?? novaDevolucao?.troca?.novaQuantidade ?? 0
-        ) || null,
-      assinatura_digital:
-        novaDevolucao?.assinatura_digital ??
-        novaDevolucao?.assinatura ??
-        null,
-      token_validacao:
-        novaDevolucao?.token_validacao ??
-        novaDevolucao?.tokenValidacao ??
-        null,
-    };
-
+  const aoSalvarDevolucao = async (novaDevolucao) => {
     const itemLocal = normalizarDevolucao({
-      id: Date.now(),
+      id: novaDevolucao?.id ?? Date.now(),
       ...novaDevolucao,
-      ...payload,
     });
 
-    try {
-      await api.post("/devolucao", payload);
-      setDevolucoes((prev) => [itemLocal, ...prev]);
-      setPaginaAtual(1);
-    } catch (erro) {
-      try {
-        await api.post("/devolucoes", payload);
-        setDevolucoes((prev) => [itemLocal, ...prev]);
-        setPaginaAtual(1);
-      } catch (erro2) {
-        setDevolucoes((prev) => [itemLocal, ...prev]);
-        setPaginaAtual(1);
-      }
-    }
-  };
+    setDevolucoes((prev) => {
+      const semDuplicado = prev.filter(
+        (item) => Number(item.id) !== Number(itemLocal.id)
+      );
+      return [itemLocal, ...semDuplicado];
+    });
 
-  const aoSalvarDevolucao = async (novaDevolucao) => {
-    await receberNovaDevolucao(novaDevolucao);
+    setPaginaAtual(1);
     setModalAberto(false);
   };
+
+  if (!podeVisualizar) {
+    return (
+      <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-amber-700">
+          Você não tem permissão para visualizar a tela de devoluções.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
@@ -1295,7 +1264,8 @@ function Devolucoes() {
             🔄 Devoluções e Trocas
           </h2>
           <p className="text-sm text-gray-500">
-            Registre, filtre e imprima relatórios de devoluções conforme a tabela devolução.
+            Registre, filtre e imprima relatórios de devoluções conforme a tabela
+            devolução.
           </p>
         </div>
 
@@ -1307,14 +1277,51 @@ function Devolucoes() {
             <span>🖨️</span> Relatório
           </button>
 
-          <button
-            onClick={() => setModalAberto(true)}
-            className="bg-red-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-800 transition flex items-center gap-2 shadow-sm justify-center w-full sm:w-auto"
-          >
-            <span>➕</span> Registrar Devolução
-          </button>
+          {podeCadastrar && (
+            <button
+              onClick={() => setModalAberto(true)}
+              className="bg-red-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-800 transition flex items-center gap-2 shadow-sm justify-center w-full sm:w-auto"
+            >
+              <span>➕</span> Registrar Devolução
+            </button>
+          )}
         </div>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+          <span className="text-[11px] text-red-700 uppercase font-bold tracking-wide block mb-1">
+            Devoluções visíveis
+          </span>
+          <strong className="text-2xl text-red-900">
+            {carregandoTela ? "--" : resumoTela.totalDevolucoes}
+          </strong>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+          <span className="text-[11px] text-emerald-700 uppercase font-bold tracking-wide block mb-1">
+            Com troca
+          </span>
+          <strong className="text-2xl text-emerald-900">
+            {carregandoTela ? "--" : resumoTela.totalTrocas}
+          </strong>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <span className="text-[11px] text-gray-600 uppercase font-bold tracking-wide block mb-1">
+            Sem troca
+          </span>
+          <strong className="text-2xl text-gray-900">
+            {carregandoTela ? "--" : resumoTela.totalSemTroca}
+          </strong>
+        </div>
+      </div>
+
+      {erroTela && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          {erroTela}
+        </div>
+      )}
 
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
         <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">
@@ -1389,34 +1396,144 @@ function Devolucoes() {
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-            <tr>
-              <th className="p-4 font-semibold">Data</th>
-              <th className="p-4 font-semibold">Funcionário</th>
-              <th className="p-4 font-semibold">Item Devolvido</th>
-              <th className="p-4 font-semibold">Motivo</th>
-              <th className="p-4 font-semibold text-center">Troca?</th>
-              <th className="p-4 font-semibold text-center">Assinatura</th>
-            </tr>
-          </thead>
+      {carregandoTela ? (
+        <div className="border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500">
+          Carregando devoluções...
+        </div>
+      ) : (
+        <>
+          <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                <tr>
+                  <th className="p-4 font-semibold">Data</th>
+                  <th className="p-4 font-semibold">Funcionário</th>
+                  <th className="p-4 font-semibold">Item Devolvido</th>
+                  <th className="p-4 font-semibold">Motivo</th>
+                  <th className="p-4 font-semibold text-center">Troca?</th>
+                  <th className="p-4 font-semibold text-center">Assinatura</th>
+                </tr>
+              </thead>
 
-          <tbody className="divide-y divide-gray-200">
-            {devolucoesVisiveis.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="p-8 text-center text-gray-500">
-                  Nenhuma devolução encontrada no banco de dados.
-                </td>
-              </tr>
-            ) : (
+              <tbody className="divide-y divide-gray-200">
+                {devolucoesVisiveis.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-8 text-center text-gray-500">
+                      Nenhuma devolução encontrada no banco de dados.
+                    </td>
+                  </tr>
+                ) : (
+                  devolucoesVisiveis.map((d) => (
+                    <tr key={d.id} className="hover:bg-gray-50 transition">
+                      <td className="p-4 text-gray-600 font-mono text-sm">
+                        {formatarData(d.data_devolucao)}
+                      </td>
+
+                      <td className="p-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            abrirModalRelatorioFuncionario({
+                              id: d.idFuncionario,
+                              nome: d.funcionarioNome,
+                              matricula: d.funcionarioMatricula,
+                            })
+                          }
+                          className="text-left group"
+                        >
+                          <div className="font-bold text-red-700 group-hover:text-red-900 group-hover:underline transition">
+                            {d.funcionarioNome}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Mat: {d.funcionarioMatricula}
+                          </div>
+                          <div className="text-[11px] text-red-600 mt-1 opacity-90">
+                            Clique para selecionar período e imprimir
+                          </div>
+                        </button>
+                      </td>
+
+                      <td className="p-4 text-gray-700">
+                        <div>
+                          {d.epiNome}{" "}
+                          <span className="text-gray-400 text-xs">
+                            ({d.tamanhoNome})
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Quantidade: {d.quantidadeADevolver}
+                        </div>
+                        {d.houveTroca && (
+                          <div className="text-xs text-green-700 mt-1">
+                            Troca por: <b>{d.epiNovoNome}</b> ({d.tamanhoNovoNome}) x
+                            {d.quantidadeNova || 0}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-4 text-sm">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded border border-gray-200 text-xs font-semibold">
+                          {d.motivoNome}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-center">
+                        {d.houveTroca ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-200">
+                            ✅ SIM
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-bold border border-gray-200">
+                            ❌ NÃO
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-4 text-center">
+                        {d.assinatura_digital || d.token_validacao ? (
+                          <span
+                            className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200"
+                            title="Assinado Digitalmente"
+                          >
+                            ✍️ OK
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="lg:hidden space-y-4">
+            {devolucoesVisiveis.length > 0 ? (
               devolucoesVisiveis.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50 transition">
-                  <td className="p-4 text-gray-600 font-mono text-sm">
-                    {formatarData(d.data_devolucao)}
-                  </td>
+                <div
+                  key={d.id}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative"
+                >
+                  <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                        {formatarData(d.data_devolucao)}
+                      </span>
 
-                  <td className="p-4">
+                      {d.houveTroca ? (
+                        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1 py-0.5 rounded border border-green-100">
+                          🔄 Troca
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-1 py-0.5 rounded border border-gray-100">
+                          ↩️ Devolução
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
                     <button
                       type="button"
                       onClick={() =>
@@ -1426,196 +1543,98 @@ function Devolucoes() {
                           matricula: d.funcionarioMatricula,
                         })
                       }
-                      className="text-left group"
+                      className="text-left"
                     >
-                      <div className="font-bold text-red-700 group-hover:text-red-900 group-hover:underline transition">
+                      <h3 className="font-bold text-red-700 text-lg hover:underline">
                         {d.funcionarioNome}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        Mat: {d.funcionarioMatricula}
-                      </div>
-                      <div className="text-[11px] text-red-600 mt-1 opacity-90">
-                        Clique para selecionar período e imprimir
-                      </div>
+                      </h3>
+                      <span className="text-xs text-gray-500 block">
+                        Matrícula: {d.funcionarioMatricula}
+                      </span>
+                      <span className="text-[11px] text-red-600 block mt-1">
+                        Toque para selecionar período e imprimir
+                      </span>
                     </button>
-                  </td>
+                  </div>
 
-                  <td className="p-4 text-gray-700">
-                    <div>
-                      {d.epiNome}{" "}
-                      <span className="text-gray-400 text-xs">({d.tamanhoNome})</span>
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-2">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-xs text-gray-500">Item:</span>
+                      <span className="text-sm font-semibold text-gray-700 text-right">
+                        {d.epiNome}{" "}
+                        <small className="text-gray-400">({d.tamanhoNome})</small>
+                      </span>
                     </div>
-                    <div className="text-xs text-gray-400">
-                      Quantidade: {d.quantidadeADevolver}
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">Quantidade:</span>
+                      <span className="text-sm font-semibold text-gray-700">
+                        {d.quantidadeADevolver}
+                      </span>
                     </div>
+
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-xs text-gray-500">Motivo:</span>
+                      <span className="text-xs font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 text-right">
+                        {d.motivoNome}
+                      </span>
+                    </div>
+
                     {d.houveTroca && (
-                      <div className="text-xs text-green-700 mt-1">
-                        Troca por: <b>{d.epiNovoNome}</b> ({d.tamanhoNovoNome}) x
-                        {d.quantidadeNova || 0}
+                      <div className="pt-2 border-t border-gray-200">
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
+                          Item da troca
+                        </span>
+                        <span className="text-sm text-green-700 font-semibold">
+                          {d.epiNovoNome} ({d.tamanhoNovoNome}) x
+                          {d.quantidadeNova || 0}
+                        </span>
                       </div>
                     )}
-                  </td>
-
-                  <td className="p-4 text-sm">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded border border-gray-200 text-xs font-semibold">
-                      {d.motivoNome}
-                    </span>
-                  </td>
-
-                  <td className="p-4 text-center">
-                    {d.houveTroca ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-200">
-                        ✅ SIM
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-bold border border-gray-200">
-                        ❌ NÃO
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="p-4 text-center">
-                    {d.assinatura_digital || d.token_validacao ? (
-                      <span
-                        className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200"
-                        title="Assinado Digitalmente"
-                      >
-                        ✍️ OK
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="lg:hidden space-y-4">
-        {devolucoesVisiveis.length > 0 ? (
-          devolucoesVisiveis.map((d) => (
-            <div
-              key={d.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative"
-            >
-              <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                    {formatarData(d.data_devolucao)}
-                  </span>
-
-                  {d.houveTroca ? (
-                    <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1 py-0.5 rounded border border-green-100">
-                      🔄 Troca
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-1 py-0.5 rounded border border-gray-100">
-                      ↩️ Devolução
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    abrirModalRelatorioFuncionario({
-                      id: d.idFuncionario,
-                      nome: d.funcionarioNome,
-                      matricula: d.funcionarioMatricula,
-                    })
-                  }
-                  className="text-left"
-                >
-                  <h3 className="font-bold text-red-700 text-lg hover:underline">
-                    {d.funcionarioNome}
-                  </h3>
-                  <span className="text-xs text-gray-500 block">
-                    Matrícula: {d.funcionarioMatricula}
-                  </span>
-                  <span className="text-[11px] text-red-600 block mt-1">
-                    Toque para selecionar período e imprimir
-                  </span>
-                </button>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-2">
-                <div className="flex justify-between items-center gap-3">
-                  <span className="text-xs text-gray-500">Item:</span>
-                  <span className="text-sm font-semibold text-gray-700 text-right">
-                    {d.epiNome} <small className="text-gray-400">({d.tamanhoNome})</small>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-500">Quantidade:</span>
-                  <span className="text-sm font-semibold text-gray-700">
-                    {d.quantidadeADevolver}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center gap-3">
-                  <span className="text-xs text-gray-500">Motivo:</span>
-                  <span className="text-xs font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 text-right">
-                    {d.motivoNome}
-                  </span>
-                </div>
-
-                {d.houveTroca && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
-                      Item da troca
-                    </span>
-                    <span className="text-sm text-green-700 font-semibold">
-                      {d.epiNovoNome} ({d.tamanhoNovoNome}) x{d.quantidadeNova || 0}
-                    </span>
                   </div>
-                )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                Nenhuma devolução encontrada.
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-            Nenhuma devolução encontrada.
+            )}
           </div>
-        )}
-      </div>
 
-      {totalPaginas > 1 && (
-        <div className="flex justify-between items-center mt-6 px-1">
-          <button
-            onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
-            disabled={paginaAtual === 1}
-            className={`px-4 py-2 rounded text-sm font-bold border ${
-              paginaAtual === 1
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white text-red-700 hover:bg-red-50 border-red-200"
-            }`}
-          >
-            ← Anterior
-          </button>
+          {totalPaginas > 1 && (
+            <div className="flex justify-between items-center mt-6 px-1">
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                disabled={paginaAtual === 1}
+                className={`px-4 py-2 rounded text-sm font-bold border ${
+                  paginaAtual === 1
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white text-red-700 hover:bg-red-50 border-red-200"
+                }`}
+              >
+                ← Anterior
+              </button>
 
-          <span className="text-xs lg:text-sm text-gray-600">
-            Pág. <b className="text-gray-900">{paginaAtual}</b> de <b>{totalPaginas}</b>
-          </span>
+              <span className="text-xs lg:text-sm text-gray-600">
+                Pág. <b className="text-gray-900">{paginaAtual}</b> de <b>{totalPaginas}</b>
+              </span>
 
-          <button
-            onClick={() =>
-              setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
-            }
-            disabled={paginaAtual === totalPaginas}
-            className={`px-4 py-2 rounded text-sm font-bold border ${
-              paginaAtual === totalPaginas
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white text-red-700 hover:bg-red-50 border-red-200"
-            }`}
-          >
-            Próxima →
-          </button>
-        </div>
+              <button
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+                }
+                disabled={paginaAtual === totalPaginas}
+                className={`px-4 py-2 rounded text-sm font-bold border ${
+                  paginaAtual === totalPaginas
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white text-red-700 hover:bg-red-50 border-red-200"
+                }`}
+              >
+                Próxima →
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <ModalPeriodoRelatorioDevolucao

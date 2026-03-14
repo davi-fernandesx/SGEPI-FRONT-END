@@ -6,7 +6,17 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
   const menuMaisRef = useRef(null);
 
   const perfilUsuario = useMemo(() => {
-    return usuario?.perfil || usuario?.role || "colaborador";
+    return (
+      usuario?.perfil ||
+      usuario?.role ||
+      usuario?.usuario?.perfil ||
+      usuario?.usuario?.role ||
+      "colaborador"
+    );
+  }, [usuario]);
+
+  const nomeUsuario = useMemo(() => {
+    return usuario?.nome || usuario?.usuario?.nome || "Usuário";
   }, [usuario]);
 
   const isAdmin = perfilUsuario === "admin";
@@ -27,6 +37,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
 
     return (
       <button
+        type="button"
         onClick={() => {
           setPagina(nomePagina);
           setMenuMaisAberto(false);
@@ -93,7 +104,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+            d="M17 20h5v-1a4 4 0 00-5-3.87M9 20H4v-1a4 4 0 015-3.87m8-6.13a4 4 0 11-8 0 4 4 0 018 0zm6 2a3 3 0 11-6 0 3 3 0 016 0zM6 10a3 3 0 11-6 0 3 3 0 016 0z"
           />
         </svg>
       ),
@@ -138,7 +149,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M19 14l-7 7m0 0l-7-7m7 7V3"
+            d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14"
           />
         </svg>
       ),
@@ -166,7 +177,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2M19.419 15H15"
           />
         </svg>
       ),
@@ -181,28 +192,30 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zm0-5l1.09 2.26 2.49.36-1.8 1.75.42 2.47L12 8.77 9.8 9.84l.42-2.47-1.8-1.75 2.49-.36L12 3zm0 14l1.09 2.26 2.49.36-1.8 1.75.42 2.47L12 22.77l-2.2 1.07.42-2.47-1.8-1.75 2.49-.36L12 17z"
+            d="M11.983 5.5a1.5 1.5 0 013.034 0l.18 1.271a1.5 1.5 0 001.19 1.25l1.26.252a1.5 1.5 0 01.597 2.69l-1.02.78a1.5 1.5 0 00-.5 1.683l.41 1.218a1.5 1.5 0 01-2.198 1.77l-1.116-.666a1.5 1.5 0 00-1.54 0l-1.116.666a1.5 1.5 0 01-2.198-1.77l.41-1.218a1.5 1.5 0 00-.5-1.683l-1.02-.78a1.5 1.5 0 01.597-2.69l1.26-.252a1.5 1.5 0 001.19-1.25l.18-1.271zM13.5 13a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
           />
         </svg>
       ),
     },
   ];
 
-  const navItems = todosItens.filter((item) => {
-    if (item.somenteAdmin && !isAdmin) return false;
-    return true;
-  });
+  const navItems = useMemo(() => {
+    return todosItens.filter((item) => {
+      if (item.somenteAdmin && !isAdmin) return false;
+      return true;
+    });
+  }, [isAdmin]);
 
   const menuPrincipal = navItems.filter((item) => item.principal);
   const menuSecundario = navItems.filter((item) => !item.principal);
-  const paginaNoMenuSecundario = menuSecundario.some((item) => item.nome === paginaAtual);
+  const paginaNoMenuSecundario = menuSecundario.some(
+    (item) => item.nome === paginaAtual
+  );
 
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 to-blue-900 text-white shadow-xl">
       <div className="px-4 lg:px-6 py-3">
-        {/* DESKTOP */}
         <div className="hidden lg:grid grid-cols-[auto_1fr_auto] items-center gap-6 xl:gap-8">
-          {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 xl:w-11 xl:h-11 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-sm">
               <svg className="w-5 h-5 xl:w-6 xl:h-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -223,7 +236,6 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             </div>
           </div>
 
-          {/* Menu centralizado */}
           <div className="flex justify-center min-w-0">
             <nav className="flex items-center gap-2.5 flex-wrap justify-center">
               {menuPrincipal.map((item) => (
@@ -238,6 +250,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
               {menuSecundario.length > 0 && (
                 <div className="relative" ref={menuMaisRef}>
                   <button
+                    type="button"
                     onClick={() => setMenuMaisAberto((prev) => !prev)}
                     className={`
                       shrink-0 flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
@@ -250,7 +263,9 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
                   >
                     <span>Mais</span>
                     <svg
-                      className={`w-4 h-4 transition-transform ${menuMaisAberto ? "rotate-180" : ""}`}
+                      className={`w-4 h-4 transition-transform ${
+                        menuMaisAberto ? "rotate-180" : ""
+                      }`}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -268,6 +283,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
                           return (
                             <button
                               key={item.nome}
+                              type="button"
                               onClick={() => {
                                 setPagina(item.nome);
                                 setMenuMaisAberto(false);
@@ -294,11 +310,10 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             </nav>
           </div>
 
-          {/* Usuário / sair */}
           <div className="flex items-center justify-end gap-3 shrink-0">
             <div className="hidden 2xl:flex flex-col items-end justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 min-w-[180px]">
               <span className="text-sm text-blue-100 whitespace-nowrap">
-                Olá, <b>{usuario?.nome}</b>
+                Olá, <b>{nomeUsuario}</b>
               </span>
               <span className="text-[11px] uppercase tracking-[0.18em] text-blue-300 mt-0.5">
                 {perfilUsuario}
@@ -306,6 +321,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
             </div>
 
             <button
+              type="button"
               onClick={onLogout}
               className="flex items-center gap-2 bg-red-500/10 hover:bg-red-600 hover:text-white text-red-200 border border-red-500/30 px-4 py-2.5 rounded-xl font-medium transition text-sm whitespace-nowrap"
             >
@@ -314,7 +330,6 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
           </div>
         </div>
 
-        {/* MOBILE */}
         <div className="flex lg:hidden items-center gap-4">
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-sm">
@@ -337,7 +352,8 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
           </div>
 
           <button
-            onClick={() => setMenuAberto(!menuAberto)}
+            type="button"
+            onClick={() => setMenuAberto((prev) => !prev)}
             className="ml-auto p-2.5 text-blue-100 hover:text-white border border-white/10 rounded-xl hover:bg-white/10 transition shrink-0"
           >
             {menuAberto ? (
@@ -356,7 +372,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
           <div className="lg:hidden mt-4 rounded-2xl border border-white/10 bg-white/[0.05] p-3 shadow-lg">
             <div className="px-2 pb-3 mb-3 border-b border-white/10">
               <p className="text-sm text-blue-100">
-                Olá, <b>{usuario?.nome}</b>
+                Olá, <b>{nomeUsuario}</b>
               </p>
               <p className="text-[11px] uppercase tracking-[0.18em] text-blue-300 mt-1">
                 Perfil: {perfilUsuario}
@@ -377,6 +393,7 @@ function Header({ paginaAtual, setPagina, onLogout, usuario }) {
 
             <div className="mt-3 pt-3 border-t border-white/10">
               <button
+                type="button"
                 onClick={onLogout}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium text-red-200 hover:bg-red-600 hover:text-white transition"
               >

@@ -50,7 +50,7 @@ async function buscarPrimeiraLista(rotas, fallback = []) {
       const lista = extrairLista(resp, fallback);
       if (Array.isArray(lista)) return lista;
     } catch (erro) {
-      // tenta a próxima
+      // tenta a próxima rota
     }
   }
   return fallback;
@@ -82,10 +82,26 @@ function normalizarTamanho(item) {
   };
 }
 
+async function tentarSalvarRegistros(registros) {
+  let ultimoErro = null;
+
+  for (const rota of ["/entrada-epi", "/entrada_epi", "/entradas"]) {
+    try {
+      await Promise.all(registros.map((registro) => api.post(rota, registro)));
+      return true;
+    } catch (erro) {
+      ultimoErro = erro;
+    }
+  }
+
+  throw ultimoErro || new Error("Não foi possível registrar a entrada.");
+}
+
 function ModalEntrada({ onClose, onSalvar }) {
   const [fornecedores, setFornecedores] = useState([]);
   const [epis, setEpis] = useState([]);
   const [tamanhos, setTamanhos] = useState([]);
+  const [carregandoDados, setCarregandoDados] = useState(true);
 
   const [dataEntrada, setDataEntrada] = useState(
     new Date().toISOString().split("T")[0]
@@ -93,6 +109,9 @@ function ModalEntrada({ onClose, onSalvar }) {
 
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState(null);
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
+
+  const [notaFiscalNumero, setNotaFiscalNumero] = useState("");
+  const [notaFiscalSerie, setNotaFiscalSerie] = useState("");
 
   const [itensEntrada, setItensEntrada] = useState([]);
 
@@ -110,17 +129,25 @@ function ModalEntrada({ onClose, onSalvar }) {
     let ativo = true;
 
     async function carregarDados() {
-      const [listaFornecedores, listaEpis, listaTamanhos] = await Promise.all([
-        buscarPrimeiraLista(["/fornecedores"], mockFornecedores),
-        buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
-        buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
-      ]);
+      setCarregandoDados(true);
 
-      if (!ativo) return;
+      try {
+        const [listaFornecedores, listaEpis, listaTamanhos] = await Promise.all([
+          buscarPrimeiraLista(["/fornecedores"], mockFornecedores),
+          buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
+          buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
+        ]);
 
-      setFornecedores(listaFornecedores.map(normalizarFornecedor));
-      setEpis(listaEpis.map(normalizarEpi));
-      setTamanhos(listaTamanhos.map(normalizarTamanho));
+        if (!ativo) return;
+
+        setFornecedores(listaFornecedores.map(normalizarFornecedor));
+        setEpis(listaEpis.map(normalizarEpi));
+        setTamanhos(listaTamanhos.map(normalizarTamanho));
+      } finally {
+        if (ativo) {
+          setCarregandoDados(false);
+        }
+      }
     }
 
     carregarDados();
@@ -153,7 +180,10 @@ function ModalEntrada({ onClose, onSalvar }) {
   }, [fornecedores, buscaFornecedor]);
 
   const valorTotalEntrada = useMemo(() => {
-    return itensEntrada.reduce((acc, item) => acc + Number(item.totalItem || 0), 0);
+    return itensEntrada.reduce(
+      (acc, item) => acc + Number(item.totalItem || 0),
+      0
+    );
   }, [itensEntrada]);
 
   function limparCamposItem() {
@@ -185,6 +215,19 @@ function ModalEntrada({ onClose, onSalvar }) {
       return;
     }
 
+    const itemDuplicado = itensEntrada.some(
+      (item) =>
+        Number(item.idEpi) === Number(epiId) &&
+        Number(item.idTamanho) === Number(tamanhoTemp) &&
+        String(item.lote || "").toLowerCase() ===
+          String(loteTemp || "").trim().toLowerCase()
+    );
+
+    if (itemDuplicado) {
+      alert("Esse item com esse tamanho e lote já foi adicionado.");
+      return;
+    }
+
     const novoItem = {
       id: Date.now() + Math.random(),
       idEpi: Number(epiId),
@@ -192,7 +235,7 @@ function ModalEntrada({ onClose, onSalvar }) {
       ca: epiSelecionadoObj?.CA || "-",
       idTamanho: Number(tamanhoTemp),
       tamanhoNome: tamanhoSelecionadoObj?.tamanho || "-",
-      quantidade: quantidade,
+      quantidade,
       quantidadeAtual: quantidade,
       valor_unitario: valorUnitario,
       lote: loteTemp.trim(),
@@ -211,7 +254,7 @@ function ModalEntrada({ onClose, onSalvar }) {
     }
   }
 
-  const salvarEntrada = async () => {
+  async function salvarEntrada() {
     if (!fornecedorSelecionado) {
       alert("Selecione um fornecedor.");
       return;
@@ -240,26 +283,9 @@ function ModalEntrada({ onClose, onSalvar }) {
       data_validade: item.data_validade || null,
       lote: item.lote,
       valor_unitario: Number(item.valor_unitario),
+      nota_fiscal_numero: notaFiscalNumero?.trim() || "",
+      nota_fiscal_serie: notaFiscalSerie?.trim() || "",
     }));
-
-    let salvouNoServidor = false;
-
-    try {
-      await Promise.all(registros.map((registro) => api.post("/entrada-epi", registro)));
-      salvouNoServidor = true;
-    } catch (erro) {
-      try {
-        await Promise.all(registros.map((registro) => api.post("/entrada_epi", registro)));
-        salvouNoServidor = true;
-      } catch (erro2) {
-        try {
-          await Promise.all(registros.map((registro) => api.post("/entrada", registro)));
-          salvouNoServidor = true;
-        } catch (erro3) {
-          salvouNoServidor = false;
-        }
-      }
-    }
 
     const retornoLocal = {
       id: Date.now(),
@@ -269,6 +295,8 @@ function ModalEntrada({ onClose, onSalvar }) {
         fornecedorSelecionado.razao_social ||
         "",
       data_entrada: dataEntrada,
+      nota_fiscal_numero: notaFiscalNumero?.trim() || "",
+      nota_fiscal_serie: notaFiscalSerie?.trim() || "",
       itens: registros.map((registro, index) => ({
         id: Date.now() + index,
         ...registro,
@@ -278,27 +306,46 @@ function ModalEntrada({ onClose, onSalvar }) {
       valor_total: valorTotalEntrada,
     };
 
-    if (onSalvar) {
-      onSalvar(retornoLocal);
-    }
+    let salvouNoServidor = false;
 
-    if (salvouNoServidor) {
-      alert("Entrada registrada com sucesso.");
-    } else {
-      alert("Não foi possível salvar no servidor. Os dados foram mantidos localmente nesta sessão.");
-    }
+    try {
+      try {
+        await tentarSalvarRegistros(registros);
+        salvouNoServidor = true;
+      } catch (erro) {
+        salvouNoServidor = false;
+      }
 
-    onClose();
-    setCarregando(false);
-  };
+      if (onSalvar) {
+        await onSalvar(retornoLocal);
+      }
+
+      if (salvouNoServidor) {
+        alert("Entrada registrada com sucesso.");
+      } else {
+        alert(
+          "Não foi possível salvar no servidor. Os dados foram mantidos localmente nesta sessão."
+        );
+      }
+
+      onClose();
+    } finally {
+      setCarregando(false);
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900 bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden animate-fade-in flex flex-col max-h-[95vh] border border-slate-200">
         <div className="bg-emerald-600 px-6 py-4 flex justify-between items-center shadow-md z-10">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-lg text-white">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -319,16 +366,33 @@ function ModalEntrada({ onClose, onSalvar }) {
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="text-emerald-100 hover:text-white hover:bg-emerald-700 p-2 rounded-full transition"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-6 space-y-6">
+          {carregandoDados && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Carregando fornecedores, EPIs e tamanhos...
+            </div>
+          )}
+
           <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2">
               1. Dados gerais da entrada
@@ -341,10 +405,11 @@ function ModalEntrada({ onClose, onSalvar }) {
                 </label>
 
                 {fornecedorSelecionado ? (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex justify-between items-center">
-                    <div>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex justify-between items-center gap-4">
+                    <div className="min-w-0">
                       <p className="font-bold text-emerald-900">
-                        {fornecedorSelecionado.nome_fantasia || fornecedorSelecionado.razao_social}
+                        {fornecedorSelecionado.nome_fantasia ||
+                          fornecedorSelecionado.razao_social}
                       </p>
                       <p className="text-xs text-emerald-600">
                         Razão social: {fornecedorSelecionado.razao_social || "-"}
@@ -355,11 +420,12 @@ function ModalEntrada({ onClose, onSalvar }) {
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => {
                         setFornecedorSelecionado(null);
                         setBuscaFornecedor("");
                       }}
-                      className="text-xs text-red-500 hover:text-red-700 font-medium underline px-2"
+                      className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium underline px-2"
                     >
                       Trocar
                     </button>
@@ -418,6 +484,32 @@ function ModalEntrada({ onClose, onSalvar }) {
                   className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm text-slate-600"
                   value={dataEntrada}
                   onChange={(e) => setDataEntrada(e.target.value)}
+                />
+              </div>
+
+              <div className="md:col-span-6">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Número da Nota Fiscal
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  placeholder="Ex.: 12345"
+                  value={notaFiscalNumero}
+                  onChange={(e) => setNotaFiscalNumero(e.target.value)}
+                />
+              </div>
+
+              <div className="md:col-span-6">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Série da Nota Fiscal
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  placeholder="Ex.: 1"
+                  value={notaFiscalSerie}
+                  onChange={(e) => setNotaFiscalSerie(e.target.value)}
                 />
               </div>
             </div>
@@ -516,6 +608,7 @@ function ModalEntrada({ onClose, onSalvar }) {
 
               <div className="md:col-span-2">
                 <button
+                  type="button"
                   onClick={adicionarItem}
                   className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded shadow-md transition flex items-center justify-center gap-1 text-sm"
                 >
@@ -566,13 +659,19 @@ function ModalEntrada({ onClose, onSalvar }) {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {itensEntrada.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-slate-400 italic bg-white">
+                        <td
+                          colSpan="7"
+                          className="p-8 text-center text-slate-400 italic bg-white"
+                        >
                           Nenhum item adicionado ainda.
                         </td>
                       </tr>
                     ) : (
                       itensEntrada.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-50 transition bg-white">
+                        <tr
+                          key={item.id}
+                          className="hover:bg-slate-50 transition bg-white"
+                        >
                           <td className="p-3">
                             <span className="font-medium text-slate-800">
                               {item.epiNome}
@@ -611,11 +710,17 @@ function ModalEntrada({ onClose, onSalvar }) {
 
                           <td className="p-3 text-center">
                             <button
+                              type="button"
                               onClick={() => removerItem(item.id)}
                               className="text-red-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition"
                               title="Remover item"
                             >
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -662,6 +767,7 @@ function ModalEntrada({ onClose, onSalvar }) {
 
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={onClose}
               className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-lg transition"
             >
@@ -669,14 +775,25 @@ function ModalEntrada({ onClose, onSalvar }) {
             </button>
 
             <button
+              type="button"
               onClick={salvarEntrada}
               disabled={carregando}
-              className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center gap-2 transform active:scale-95 disabled:opacity-60"
+              className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center gap-2 active:scale-95 disabled:opacity-60"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
-              Finalizar Entrada
+              {carregando ? "Salvando..." : "Finalizar Entrada"}
             </button>
           </div>
         </div>

@@ -1,6 +1,67 @@
 import { useState } from "react";
 import { api } from "../services/api";
 
+function extrairToken(dados) {
+  return (
+    dados?.token ??
+    dados?.access_token ??
+    dados?.accessToken ??
+    dados?.jwt ??
+    dados?.data?.token ??
+    dados?.data?.access_token ??
+    dados?.data?.accessToken ??
+    ""
+  );
+}
+
+function extrairUsuario(dados, fallbackEmail = "") {
+  const usuario =
+    dados?.usuario ??
+    dados?.user ??
+    dados?.usuarioLogado ??
+    dados?.data?.usuario ??
+    dados?.data?.user ??
+    null;
+
+  if (usuario && typeof usuario === "object") {
+    return {
+      id: usuario?.id ?? usuario?.ID ?? 0,
+      nome: usuario?.nome ?? usuario?.name ?? "Usuário",
+      email: usuario?.email ?? fallbackEmail,
+      perfil:
+        usuario?.perfil ??
+        usuario?.role ??
+        usuario?.tipo ??
+        usuario?.cargo ??
+        "colaborador",
+    };
+  }
+
+  return {
+    id: 0,
+    nome: "Usuário",
+    email: fallbackEmail,
+    perfil: "colaborador",
+  };
+}
+
+async function fazerLoginNasRotas(payload) {
+  const rotas = ["/login", "/auth/login"];
+
+  let ultimoErro = null;
+
+  for (const rota of rotas) {
+    try {
+      const resposta = await api.post(rota, payload);
+      return resposta;
+    } catch (erro) {
+      ultimoErro = erro;
+    }
+  }
+
+  throw ultimoErro || new Error("Não foi possível realizar login.");
+}
+
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -11,7 +72,10 @@ function Login({ onLogin }) {
     e.preventDefault();
     setErro("");
 
-    if (!email || !senha) {
+    const emailLimpo = email.trim();
+    const senhaLimpa = senha.trim();
+
+    if (!emailLimpo || !senhaLimpa) {
       setErro("Preencha e-mail e senha.");
       return;
     }
@@ -19,24 +83,29 @@ function Login({ onLogin }) {
     try {
       setCarregando(true);
 
-      const resposta = await api.post("/login", {
-        email,
-        senha,
+      const resposta = await fazerLoginNasRotas({
+        email: emailLimpo,
+        senha: senhaLimpa,
       });
 
-      if (!resposta?.token) {
+      const token = extrairToken(resposta);
+      const usuario = extrairUsuario(resposta, emailLimpo);
+
+      if (!token) {
         throw new Error("Token não recebido no login.");
       }
 
-      localStorage.setItem("token", resposta.token);
-      localStorage.setItem("usuario", JSON.stringify(resposta.usuario));
+      localStorage.setItem("token", token);
+      localStorage.setItem("usuario", JSON.stringify(usuario));
 
-      onLogin({
-        token: resposta.token,
-        usuario: resposta.usuario,
-      });
+      if (onLogin) {
+        onLogin({
+          token,
+          usuario,
+        });
+      }
     } catch (err) {
-      setErro(err.message || "Erro ao realizar login.");
+      setErro(err?.message || "Erro ao realizar login.");
     } finally {
       setCarregando(false);
     }
@@ -73,6 +142,7 @@ function Login({ onLogin }) {
               placeholder="seuemail@empresa.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
 
@@ -86,6 +156,7 @@ function Login({ onLogin }) {
               placeholder="••••••••"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
+              autoComplete="current-password"
             />
           </div>
 

@@ -1,72 +1,216 @@
-# Getting Started with Create React App
+# SGEPI Front-End
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Interface web do sistema **SGEPI** (Sistema de Gestão de Equipamentos de Proteção Individual), desenvolvida para controlar o cadastro, visualização e movimentação de EPIs dentro da empresa.
 
-## Available Scripts
+Este projeto permite visualizar estoque, entradas, entregas, devoluções, colaboradores, departamentos, fornecedores e outras informações administrativas por meio de uma interface moderna e responsiva.
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## Objetivo do projeto
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+O objetivo deste front-end é oferecer uma interface prática para o uso diário do sistema de gestão de EPIs, facilitando o controle de estoque, a entrega para funcionários, o registro de devoluções, a consulta rápida de itens e a organização dos cadastros principais.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## Funcionalidades
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Login de usuário
+- Dashboard com resumo do sistema
+- Visualização de estoque
+- Consulta de funcionários
+- Consulta de fornecedores
+- Consulta de departamentos e funções
+- Registro de entradas de estoque
+- Registro de entregas com assinatura
+- Registro de devoluções e trocas com assinatura
+- Busca rápida de EPIs
+- Cadastro de EPIs
+- Área administrativa com gestão de cadastros
+- Integração com API por meio de rotas HTTP
+- Interface responsiva para desktop e mobile
 
-### `npm run build`
+---
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Tecnologias utilizadas
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- React
+- JavaScript
+- Tailwind CSS
+- Fetch API
+- LocalStorage
+- Componentização com React Hooks
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+---
 
-### `npm run eject`
+## Estrutura do projeto
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+src/
+ ├── components/
+ │   └── modals/
+ │       ├── ModalNovoEpi.jsx
+ │       ├── ModalEntrega.jsx
+ │       ├── ModalEntrada.jsx
+ │       ├── ModalBusca.jsx
+ │       └── ModalBaixa.jsx
+ │
+ ├── pages/
+ │   ├── Dashboard.jsx
+ │   ├── Estoque.jsx
+ │   ├── Funcionarios.jsx
+ │   ├── Fornecedores.jsx
+ │   ├── Entradas.jsx
+ │   ├── Entregas.jsx
+ │   ├── Devolucoes.jsx
+ │   ├── Departamentos.jsx
+ │   ├── Administracao.jsx
+ │   └── Login.jsx
+ │
+ ├── services/
+ │   ├── api.js
+ │   ├── categoriaService.js
+ │   ├── produtoService.js
+ │   └── statusService.js
+ │
+ ├── utils/
+ │   └── permissoes.js
+ │
+ └── components/
+     ├── Header.jsx
+     └── Toast.jsx
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Como executar o projeto
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. Clone o repositório
+git clone URL_DO_SEU_REPOSITORIO
 
-## Learn More
+2. Acesse a pasta do projeto
+cd nome-do-projeto
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+3. Instale as dependências
+npm install
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+4. Execute o projeto
+npm start
 
-### Code Splitting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+O sistema será iniciado normalmente em ambiente local.
 
-### Analyzing the Bundle Size
+Configuração da API
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+O front-end utiliza a variável:
 
-### Making a Progressive Web App
+REACT_APP_API_URL
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-### Advanced Configuration
+Caso ela não esteja definida, o projeto usa por padrão:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+http://empresa.lvh.me:8080/api
 
-### Deployment
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Exemplo de arquivo .env:
 
-### `npm run build` fails to minify
+REACT_APP_API_URL=http://empresa.lvh.me:8080/api
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Autenticação
 
-© 2026 Rickman Brown • Software Engineering
+O login do sistema é feito por token JWT.
+
+Após autenticação:
+
+o token é salvo no localStorage
+
+os dados do usuário também são salvos no localStorage
+
+o token é enviado automaticamente no header Authorization nas requisições protegidas
+
+Exemplo:
+
+Authorization: Bearer SEU_TOKEN
+
+Principais telas
+Login
+
+Tela de autenticação do usuário.
+
+Dashboard
+
+Resumo geral do sistema com indicadores de estoque, entregas, alertas e valor estimado em estoque.
+
+Estoque
+
+Visualização dos EPIs disponíveis, quantidades, tamanhos, fabricantes, validade e lotes.
+
+Funcionários
+
+Listagem de colaboradores cadastrados.
+
+Fornecedores
+
+Listagem de fornecedores cadastrados.
+
+Entradas
+
+Registro e visualização das entradas de estoque.
+
+Entregas
+
+Registro de entregas de EPIs para funcionários, incluindo assinatura.
+
+Devoluções
+
+Registro de devoluções e trocas de EPIs, também com assinatura.
+
+Departamentos
+
+Visualização e gerenciamento de departamentos e funções.
+
+Administração
+
+Painel administrativo com gerenciamento de fornecedores, funcionários, departamentos, funções, usuários e EPIs.
+
+Padrão de integração com API
+
+O projeto centraliza as requisições no arquivo:
+
+src/services/api.js
+
+
+Métodos disponíveis:
+
+api.get
+
+api.post
+
+api.put
+
+api.patch
+
+api.delete
+
+Esses métodos já:
+
+montam headers automaticamente
+
+enviam o token JWT quando existir
+
+tratam respostas JSON
+
+lançam erros padronizados
+
+Organização do código
+
+Este front-end foi organizado com foco em:
+
+separação por páginas
+
+modais reutilizáveis
+
+centralização da comunicação com a API
+
+normalização de dados recebidos do back-end
+
+uso de fallback com mocks para facilitar testes visuais
+
+responsividade para diferentes tamanhos de tela
