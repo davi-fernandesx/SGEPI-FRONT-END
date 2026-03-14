@@ -1,6 +1,5 @@
-Claro. Abaixo está o conteúdo pronto para você copiar e colar em `rotas-frontend.md`.
 
-````md
+````
 # Rotas do Front-End - SGEPI
 
 Este documento descreve as rotas consumidas pelo front-end do sistema **SGEPI**.  
