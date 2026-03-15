@@ -1,69 +1,7 @@
 import { useState } from "react";
-import { api } from "../services/api";
-
-function extrairToken(dados) {
-  return (
-    dados?.token ??
-    dados?.access_token ??
-    dados?.accessToken ??
-    dados?.jwt ??
-    dados?.data?.token ??
-    dados?.data?.access_token ??
-    dados?.data?.accessToken ??
-    ""
-  );
-}
-
-function extrairUsuario(dados, fallbackEmail = "") {
-  const usuario =
-    dados?.usuario ??
-    dados?.user ??
-    dados?.usuarioLogado ??
-    dados?.data?.usuario ??
-    dados?.data?.user ??
-    null;
-
-  if (usuario && typeof usuario === "object") {
-    return {
-      id: usuario?.id ?? usuario?.ID ?? 0,
-      nome: usuario?.nome ?? usuario?.name ?? "Usuário",
-      email: usuario?.email ?? fallbackEmail,
-      perfil:
-        usuario?.perfil ??
-        usuario?.role ??
-        usuario?.tipo ??
-        usuario?.cargo ??
-        "colaborador",
-    };
-  }
-
-  return {
-    id: 0,
-    nome: "Usuário",
-    email: fallbackEmail,
-    perfil: "colaborador",
-  };
-}
-
-async function fazerLoginNasRotas(payload) {
-  const rotas = ["/login", "/auth/login"];
-
-  let ultimoErro = null;
-
-  for (const rota of rotas) {
-    try {
-      const resposta = await api.post(rota, payload);
-      return resposta;
-    } catch (erro) {
-      ultimoErro = erro;
-    }
-  }
-
-  throw ultimoErro || new Error("Não foi possível realizar login.");
-}
 
 function Login({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -72,28 +10,28 @@ function Login({ onLogin }) {
     e.preventDefault();
     setErro("");
 
-    const emailLimpo = email.trim();
+    const loginLimpo = login.trim();
     const senhaLimpa = senha.trim();
 
-    if (!emailLimpo || !senhaLimpa) {
-      setErro("Preencha e-mail e senha.");
+    if (!loginLimpo || !senhaLimpa) {
+      setErro("Preencha login e senha.");
       return;
     }
 
     try {
       setCarregando(true);
 
-      const resposta = await fazerLoginNasRotas({
-        email: emailLimpo,
-        senha: senhaLimpa,
-      });
-
-      const token = extrairToken(resposta);
-      const usuario = extrairUsuario(resposta, emailLimpo);
-
-      if (!token) {
-        throw new Error("Token não recebido no login.");
+      if (loginLimpo !== "adm" || senhaLimpa !== "123") {
+        throw new Error("Login ou senha inválidos.");
       }
+
+      const token = "token-fixo-admin";
+      const usuario = {
+        id: 1,
+        nome: "Administrador",
+        email: "adm@sgepi.com",
+        perfil: "admin",
+      };
 
       localStorage.setItem("token", token);
       localStorage.setItem("usuario", JSON.stringify(usuario));
@@ -134,15 +72,15 @@ function Login({ onLogin }) {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">
-              E-mail
+              Login
             </label>
             <input
-              type="email"
+              type="text"
               className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition"
-              placeholder="seuemail@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              placeholder="Digite seu login"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              autoComplete="username"
             />
           </div>
 
