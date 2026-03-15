@@ -78,107 +78,108 @@ src/
  └── components/
      ├── Header.jsx
      └── Toast.jsx
+```
+
+# Como executar o projeto
+
+1. Clone o repositório  
+   `git clone URL_DO_SEU_REPOSITORIO`
+
+2. Acesse a pasta do projeto  
+   `cd nome-do-projeto`
+
+3. Instale as dependências  
+   `npm install`
+
+4. Execute o projeto  
+   `npm start`
 
 
-Como executar o projeto
+- O sistema será iniciado normalmente em ambiente local.
 
-1. Clone o repositório
-git clone URL_DO_SEU_REPOSITORIO
-
-2. Acesse a pasta do projeto
-cd nome-do-projeto
-
-3. Instale as dependências
-npm install
-
-4. Execute o projeto
-npm start
-
-
-O sistema será iniciado normalmente em ambiente local.
-
-Configuração da API
+# Configuração da API
 
 O front-end utiliza a variável:
 
-REACT_APP_API_URL
+`REACT_APP_API_URL`
 
 
 Caso ela não esteja definida, o projeto usa por padrão:
 
-http://empresa.lvh.me:8080/api
+`http://empresa.lvh.me:8080/api`
 
 
 Exemplo de arquivo .env:
 
-REACT_APP_API_URL=http://empresa.lvh.me:8080/api
+`REACT_APP_API_URL=http://empresa.lvh.me:8080/api`
 
-Autenticação
+# Autenticação
 
-O login do sistema é feito por token JWT.
+- O login do sistema é feito por token JWT.
 
-Após autenticação:
+- Após autenticação:
 
-o token é salvo no localStorage
+- O token é salvo no localStorage
 
-os dados do usuário também são salvos no localStorage
+- Os dados do usuário também são salvos no localStorage
 
-o token é enviado automaticamente no header Authorization nas requisições protegidas
+- O token é enviado automaticamente no header Authorization nas requisições protegidas
 
 Exemplo:
 
-Authorization: Bearer SEU_TOKEN
+`Authorization: Bearer SEU_TOKEN`
 
-Principais telas
-Login
+# Principais telas
+
+- Login
 
 Tela de autenticação do usuário.
 
-Dashboard
+- Dashboard
 
 Resumo geral do sistema com indicadores de estoque, entregas, alertas e valor estimado em estoque.
 
-Estoque
+- Estoque
 
 Visualização dos EPIs disponíveis, quantidades, tamanhos, fabricantes, validade e lotes.
 
-Funcionários
+- Funcionários
 
 Listagem de colaboradores cadastrados.
 
-Fornecedores
+- Fornecedores
 
 Listagem de fornecedores cadastrados.
 
-Entradas
+- Entradas
 
 Registro e visualização das entradas de estoque.
 
-Entregas
+- Entregas
 
 Registro de entregas de EPIs para funcionários, incluindo assinatura.
 
-Devoluções
+- Devoluções
 
 Registro de devoluções e trocas de EPIs, também com assinatura.
 
-Departamentos
+- Departamentos
 
 Visualização e gerenciamento de departamentos e funções.
 
-Administração
+- Administração
 
 Painel administrativo com gerenciamento de fornecedores, funcionários, departamentos, funções, usuários e EPIs.
 
-Padrão de integração com API
+# Padrão de integração com API
 
 O projeto centraliza as requisições no arquivo:
 
-src/services/api.js
+`src/services/api.js`
 
 
-Métodos disponíveis:
-
+- Métodos disponíveis:
+```
 api.get
 
 api.post
@@ -188,29 +189,14 @@ api.put
 api.patch
 
 api.delete
-
+```
 Esses métodos já:
 
-montam headers automaticamente
+- Montam headers automaticamente
 
-enviam o token JWT quando existir
+- Enviam o token JWT quando existir
 
-tratam respostas JSON
+- Tratam respostas JSON
 
-lançam erros padronizados
+- Lançam erros padronizados
 
-Organização do código
-
-Este front-end foi organizado com foco em:
-
-separação por páginas
-
-modais reutilizáveis
-
-centralização da comunicação com a API
-
-normalização de dados recebidos do back-end
-
-uso de fallback com mocks para facilitar testes visuais
-
-responsividade para diferentes tamanhos de tela
