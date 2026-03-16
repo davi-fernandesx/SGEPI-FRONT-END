@@ -2,29 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
 import { temPermissao } from "../utils/permissoes";
 
-const mockFornecedores = [
-  {
-    id: 1,
-    razao_social: "3M do Brasil Ltda",
-    nome_fantasia: "3M",
-    cnpj: "45.985.371/0001-08",
-    inscricao_estadual: "123.456.789.000",
-  },
-  {
-    id: 2,
-    razao_social: "Bracol Calçados de Segurança Ltda",
-    nome_fantasia: "Bracol",
-    cnpj: "12.345.678/0001-90",
-    inscricao_estadual: "987.654.321.000",
-  },
-  {
-    id: 3,
-    razao_social: "Kalipso Equipamentos Individuais Ltda",
-    nome_fantasia: "Kalipso",
-    cnpj: "98.765.432/0001-55",
-    inscricao_estadual: "456.123.789.000",
-  },
-];
+// Caso mockFornecedores venha de outro arquivo, você pode importar aqui. 
+// Deixei um array vazio por padrão para evitar erros caso não exista no seu código.
+const mockFornecedores = []; 
 
 function extrairLista(resp, fallback = []) {
   const dados = resp?.data ?? resp ?? fallback;
@@ -146,6 +126,132 @@ function ModalDetalhesFornecedor({ aberto, fornecedor, onClose }) {
   );
 }
 
+function ModalCriarFornecedor({ aberto, onClose, onSucesso }) {
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [nomeFantasia, setNomeFantasia] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [inscricaoEstadual, setInscricaoEstadual] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  if (!aberto) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErro("");
+
+    if (!razaoSocial.trim()) {
+      setErro("A Razão Social é obrigatória.");
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      await api.post("/fornecedores", {
+        razao_social: razaoSocial,
+        nome_fantasia: nomeFantasia,
+        cnpj: cnpj,
+        inscricao_estadual: inscricaoEstadual,
+      });
+
+      setRazaoSocial("");
+      setNomeFantasia("");
+      setCnpj("");
+      setInscricaoEstadual("");
+      
+      onSucesso();
+      onClose();
+    } catch (err) {
+
+      // 👇 COLOQUE OS CONSOLE.LOG AQUI 👇
+      console.error("❌ ERRO AO SALVAR FORNECEDOR:", err);
+      console.log("Detalhes extras do erro:", err?.message);
+      setErro(err?.message || "Erro ao salvar o fornecedor.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white px-6 py-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-bold">Novo Fornecedor</h3>
+            <p className="text-sm text-indigo-100 mt-1">Cadastre um novo fornecedor no sistema.</p>
+          </div>
+          <button type="button" onClick={onClose} className="bg-white/10 hover:bg-white/20 transition rounded-lg px-3 py-2 text-sm font-bold">
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {erro && (
+            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg border border-red-100 font-medium">
+              ⚠️ {erro}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Razão Social *</label>
+            <input
+              type="text"
+              required
+              value={razaoSocial}
+              onChange={(e) => setRazaoSocial(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Ex: Empresa Silva LTDA"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Fantasia</label>
+            <input
+              type="text"
+              value={nomeFantasia}
+              onChange={(e) => setNomeFantasia(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Ex: Mercadinho Silva"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CNPJ</label>
+              <input
+                type="text"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                placeholder="00.000.000/0000-00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Insc. Estadual</label>
+              <input
+                type="text"
+                value={inscricaoEstadual}
+                onChange={(e) => setInscricaoEstadual(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="000.000.000.000"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 gap-2 border-t border-slate-100 mt-6">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition">
+              Cancelar
+            </button>
+            <button type="submit" disabled={salvando} className={`px-4 py-2 rounded-xl text-white font-bold transition ${salvando ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}>
+              {salvando ? "Salvando..." : "Salvar Fornecedor"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Fornecedores({ usuarioLogado }) {
   const [fornecedores, setFornecedores] = useState([]);
   const [busca, setBusca] = useState("");
@@ -153,33 +259,37 @@ function Fornecedores({ usuarioLogado }) {
   const [carregando, setCarregando] = useState(true);
   const [erroTela, setErroTela] = useState("");
   const [fornecedorDetalhe, setFornecedorDetalhe] = useState(null);
+  
+  // Novo estado para controlar o modal de criação
+  const [modalCriarAberto, setModalCriarAberto] = useState(false);
 
   const itensPorPagina = 6;
 
   const podeVisualizar = temPermissao(usuarioLogado, "visualizar_fornecedores");
 
-  useEffect(() => {
-    async function carregarFornecedores() {
-      setCarregando(true);
-      setErroTela("");
+  // Função separada do useEffect para poder ser chamada após salvar um novo fornecedor
+  const carregarFornecedores = async () => {
+    setCarregando(true);
+    setErroTela("");
 
-      try {
-        const lista = await buscarPrimeiraLista(
-          ["/fornecedores", "/fornecedor"],
-          mockFornecedores
-        );
+    try {
+      const lista = await buscarPrimeiraLista(
+        ["/fornecedores", "/fornecedor"],
+        mockFornecedores
+      );
 
-        setFornecedores(lista.map(normalizarFornecedor));
-      } catch (erro) {
-        setErroTela(
-          erro?.message || "Não foi possível carregar a lista de fornecedores."
-        );
-        setFornecedores(mockFornecedores.map(normalizarFornecedor));
-      } finally {
-        setCarregando(false);
-      }
+      setFornecedores(lista.map(normalizarFornecedor));
+    } catch (erro) {
+      setErroTela(
+        erro?.message || "Não foi possível carregar a lista de fornecedores."
+      );
+      setFornecedores(mockFornecedores.map(normalizarFornecedor));
+    } finally {
+      setCarregando(false);
     }
+  };
 
+  useEffect(() => {
     carregarFornecedores();
   }, []);
 
@@ -263,6 +373,14 @@ function Fornecedores({ usuarioLogado }) {
               Visualize os fornecedores cadastrados no sistema.
             </p>
           </div>
+          
+          {/* Botão Novo Fornecedor Adicionado Aqui */}
+          <button 
+            onClick={() => setModalCriarAberto(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-md"
+          >
+            + Novo Fornecedor
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -457,6 +575,13 @@ function Fornecedores({ usuarioLogado }) {
         aberto={!!fornecedorDetalhe}
         fornecedor={fornecedorDetalhe}
         onClose={() => setFornecedorDetalhe(null)}
+      />
+
+      {/* Modal de Criação Adicionado Aqui */}
+      <ModalCriarFornecedor
+        aberto={modalCriarAberto}
+        onClose={() => setModalCriarAberto(false)}
+        onSucesso={() => carregarFornecedores()}
       />
     </>
   );

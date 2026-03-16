@@ -1,4 +1,6 @@
 import { useState } from "react";
+// 1. Importe a sua configuração da API (Ajuste o caminho conforme seu projeto)
+import { api } from "../services/api"; 
 
 function Login({ onLogin }) {
   const [login, setLogin] = useState("");
@@ -21,21 +23,29 @@ function Login({ onLogin }) {
     try {
       setCarregando(true);
 
-      if (loginLimpo !== "adm" || senhaLimpa !== "123") {
-        throw new Error("Login ou senha inválidos.");
+      // 2. Faz a requisição real para a sua API em /login
+      // Verifique se o seu back-end espera a chave "email" ou "login"
+      const resposta = await api.post("/login", {
+        email: loginLimpo, 
+        senha: senhaLimpa, 
+      });
+
+      // 3. Extrai o token e os dados do usuário da resposta do seu back-end
+      // (Ajuste "resposta.token" e "resposta.usuario" conforme o formato que seu back-end devolve)
+      const token = resposta.token;
+      const usuario = resposta.usuario; 
+
+      if (!token) {
+        throw new Error("Token de acesso não retornado pelo servidor.");
       }
 
-      const token = "token-fixo-admin";
-      const usuario = {
-        id: 1,
-        nome: "Administrador",
-        email: "adm@sgepi.com",
-        perfil: "admin",
-      };
-
+      // 4. Salva no localStorage real
       localStorage.setItem("token", token);
-      localStorage.setItem("usuario", JSON.stringify(usuario));
+      if (usuario) {
+        localStorage.setItem("usuario", JSON.stringify(usuario));
+      }
 
+      // 5. Continua o fluxo normal do seu app
       if (onLogin) {
         onLogin({
           token,
@@ -43,6 +53,7 @@ function Login({ onLogin }) {
         });
       }
     } catch (err) {
+      // O tratamento de erro já vai pegar a mensagem correta que vem da função da API
       setErro(err?.message || "Erro ao realizar login.");
     } finally {
       setCarregando(false);

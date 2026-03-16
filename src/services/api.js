@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "http://empresa.lvh.me:8080/api";
+const DEFAULT_BASE_URL = "https://api.radaptech.com.br/api";
 
 export const BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BASE_URL).replace(
   /\/+$/,
@@ -13,6 +13,17 @@ function normalizarRota(rota = "") {
 function getToken() {
   return localStorage.getItem("token");
 }
+function getTenantId() {
+  const hostname = window.location.hostname;
+
+  // Se você estiver testando na sua máquina (localhost)
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "teste"; // Força o tenant para você conseguir testar o login
+  }
+
+  // Se o front já estiver publicado (ex: frigopaiva.radaptech.com.br)
+  return hostname.split(".")[0]; 
+}
 
 function isFormData(valor) {
   return typeof FormData !== "undefined" && valor instanceof FormData;
@@ -20,14 +31,20 @@ function isFormData(valor) {
 
 function montarHeaders(headersExtras = {}, body = null) {
   const token = getToken();
+  const tenantId = getTenantId();
   const headers = { ...headersExtras };
 
   if (!isFormData(body) && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
+    headers["Content-Type"] = "application/json"
   }
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+
+  // NOVO CÓDIGO: Adiciona o header do Tenant se ele existir
+  if (tenantId) {
+    headers["X-tenant-ID"] = tenantId;
   }
 
   return headers;
@@ -41,15 +58,18 @@ function extrairMensagemErro(dados, fallback) {
   }
 
   if (typeof dados === "object") {
-    return (
-      dados.error ||
-      dados.erro ||
-      dados.message ||
-      dados.mensagem ||
-      dados.detail ||
-      dados.details ||
-      fallback
-    );
+    // Pega o erro principal
+    const erroPrincipal = dados.error || dados.erro || dados.message || dados.mensagem || fallback;
+    
+    // Pega os detalhes extras (se existirem)
+    const detalhes = dados.detalhes || dados.detail || dados.details;
+
+    // Se tiver detalhe, junta os dois!
+    if (detalhes) {
+      return `${erroPrincipal} - Detalhes: ${detalhes}`;
+    }
+
+    return erroPrincipal;
   }
 
   return fallback;
@@ -100,6 +120,8 @@ async function request(method, rota, dados = null, headersExtras = {}) {
   if (dados !== null && dados !== undefined) {
     opcoes.body = isFormData(dados) ? dados : JSON.stringify(dados);
   }
+
+  console.log(`[Requisição API] Disparando ${method} para: ${url}`);
 
   const resposta = await fetch(url, opcoes);
 
