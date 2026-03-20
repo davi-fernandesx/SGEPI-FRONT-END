@@ -1,53 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../services/api";
+import { useState } from "react";
 import { temPermissao } from "../utils/permissoes";
-
-function extrairLista(resp, fallback = []) {
-  const dados = resp?.data ?? resp ?? fallback;
-  return Array.isArray(dados) ? dados : fallback;
-}
-
-async function buscarPrimeiraLista(rotas, fallback = []) {
-  for (const rota of rotas) {
-    try {
-      const resp = await api.get(rota);
-      const lista = extrairLista(resp, fallback);
-      if (Array.isArray(lista)) return lista;
-    } catch (erro) {
-      // tenta próxima rota
-    }
-  }
-  return fallback;
-}
-
-function normalizarDepartamento(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    nome: item?.nome ?? item?.Nome ?? "",
-  };
-}
-
-function normalizarFuncao(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    nome: item?.nome ?? item?.Nome ?? "",
-    idDepartamento: Number(
-      item?.idDepartamento ??
-        item?.departamento_id ??
-        item?.departamentoId ??
-        item?.id_departamento ??
-        item?.iddepartamento ??
-        item?.IDDepartamento ??
-        0
-    ),
-  };
-}
+import { useDepartamentos } from "../hooks/useDepartamentos";
 
 function Departamentos({ usuarioLogado }) {
-  const [departamentos, setDepartamentos] = useState([]);
-  const [funcoes, setFuncoes] = useState([]);
-  const [erroTela, setErroTela] = useState("");
-  const [carregandoTela, setCarregandoTela] = useState(true);
+  const {
+    departamentos,
+    funcoes,
+    departamentosComFuncoes,
+    totalFuncoes,
+    erroTela,
+    carregandoTela,
+    carregandoDepartamento,
+    carregandoFuncao,
+    adicionarDepartamento,
+    adicionarFuncao,
+    excluirDepartamento,
+    excluirFuncao,
+  } = useDepartamentos();
 
   const [formDepartamento, setFormDepartamento] = useState({
     nome: "",
@@ -57,9 +26,6 @@ function Departamentos({ usuarioLogado }) {
     departamentoId: "",
     nome: "",
   });
-
-  const [carregandoDepartamento, setCarregandoDepartamento] = useState(false);
-  const [carregandoFuncao, setCarregandoFuncao] = useState(false);
 
   const podeVisualizar = !usuarioLogado
     ? true
@@ -79,51 +45,7 @@ function Departamentos({ usuarioLogado }) {
 
   const isAdmin = podeCadastrarDepartamento || podeExcluirDepartamento;
 
-  const carregarDados = async () => {
-    setCarregandoTela(true);
-    setErroTela("");
-
-    try {
-      const [listaDepartamentos, listaFuncoes] = await Promise.all([
-        buscarPrimeiraLista(["/departamentos", "/departamento"], []),
-        buscarPrimeiraLista(["/funcoes", "/funcao", "/cargos", "/cargo"], []),
-      ]);
-
-      setDepartamentos(listaDepartamentos.map(normalizarDepartamento));
-      setFuncoes(listaFuncoes.map(normalizarFuncao));
-    } catch (erro) {
-      console.error("Erro ao carregar departamentos/funções:", erro);
-      setErroTela(
-        erro?.message ||
-          "Não foi possível carregar os departamentos e funções."
-      );
-      setDepartamentos([]);
-      setFuncoes([]);
-    } finally {
-      setCarregandoTela(false);
-    }
-  };
-
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const departamentosComFuncoes = useMemo(() => {
-    return [...departamentos]
-      .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""))
-      .map((dep) => ({
-        ...dep,
-        funcoes: [...funcoes]
-          .filter((funcao) => Number(funcao.idDepartamento) === Number(dep.id))
-          .sort((a, b) => (a.nome || "").localeCompare(b.nome || "")),
-      }));
-  }, [departamentos, funcoes]);
-
-  const totalFuncoes = useMemo(() => {
-    return funcoes.length;
-  }, [funcoes]);
-
-  async function adicionarDepartamento(e) {
+  async function handleAdicionarDepartamento(e) {
     e.preventDefault();
 
     if (!podeCadastrarDepartamento) {
@@ -147,35 +69,15 @@ function Departamentos({ usuarioLogado }) {
       return;
     }
 
-    setCarregandoDepartamento(true);
-
-    const payload = { nome };
-
     try {
-      try {
-        await api.post("/cadastro-departamento", payload);
-      } catch (erro) {
-        try {
-          await api.post("/departamento", payload);
-        } catch (erro2) {
-          try {
-            await api.post("/departamentos", payload);
-          } catch (erro3) {
-            // fallback local
-          }
-        }
-      }
-
+      await adicionarDepartamento(nome);
       setFormDepartamento({ nome: "" });
-      await carregarDados();
     } catch (erro) {
       alert(erro?.message || "Erro ao cadastrar departamento.");
-    } finally {
-      setCarregandoDepartamento(false);
     }
   }
 
-  async function adicionarFuncao(e) {
+  async function handleAdicionarFuncao(e) {
     e.preventDefault();
 
     if (!podeGerenciarFuncoes) {
@@ -207,50 +109,15 @@ function Departamentos({ usuarioLogado }) {
       return;
     }
 
-    setCarregandoFuncao(true);
-
-    const payload = {
-      nome,
-      idDepartamento: departamentoId,
-    };
-
     try {
-      try {
-        await api.post("/cadastro-funcao", payload);
-      } catch (erro) {
-        try {
-          await api.post("/funcao", payload);
-        } catch (erro2) {
-          try {
-            await api.post("/funcoes", payload);
-          } catch (erro3) {
-            try {
-              await api.post("/cargo", payload);
-            } catch (erro4) {
-              try {
-                await api.post("/cargos", payload);
-              } catch (erro5) {
-                // fallback local
-              }
-            }
-          }
-        }
-      }
-
-      setFormFuncao((prev) => ({
-        ...prev,
-        nome: "",
-      }));
-
-      await carregarDados();
+      await adicionarFuncao({ nome, departamentoId });
+      setFormFuncao((prev) => ({ ...prev, nome: "" }));
     } catch (erro) {
       alert(erro?.message || "Erro ao cadastrar função.");
-    } finally {
-      setCarregandoFuncao(false);
     }
   }
 
-  async function excluirDepartamento(id) {
+  async function handleExcluirDepartamento(id) {
     if (!podeExcluirDepartamento) {
       alert("Apenas administradores podem excluir departamentos.");
       return;
@@ -263,40 +130,20 @@ function Departamentos({ usuarioLogado }) {
     if (!confirmar) return;
 
     try {
-      try {
-        await api.delete(`/departamento/${id}`);
-      } catch (erro) {
-        await api.delete(`/departamentos/${id}`);
-      }
-
-      await carregarDados();
+      await excluirDepartamento(id);
     } catch (erro) {
       alert(erro?.message || "Erro ao excluir departamento.");
     }
   }
 
-  async function excluirFuncao(funcaoId) {
+  async function handleExcluirFuncao(funcaoId) {
     if (!podeGerenciarFuncoes) {
       alert("Apenas administradores podem excluir funções.");
       return;
     }
 
     try {
-      try {
-        await api.delete(`/funcao/${funcaoId}`);
-      } catch (erro) {
-        try {
-          await api.delete(`/funcoes/${funcaoId}`);
-        } catch (erro2) {
-          try {
-            await api.delete(`/cargo/${funcaoId}`);
-          } catch (erro3) {
-            await api.delete(`/cargos/${funcaoId}`);
-          }
-        }
-      }
-
-      await carregarDados();
+      await excluirFuncao(funcaoId);
     } catch (erro) {
       alert(erro?.message || "Erro ao excluir função.");
     }
@@ -376,7 +223,7 @@ function Departamentos({ usuarioLogado }) {
               Adicionar departamento
             </h3>
 
-            <form onSubmit={adicionarDepartamento} className="space-y-4">
+            <form onSubmit={handleAdicionarDepartamento} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Nome do departamento
@@ -413,7 +260,7 @@ function Departamentos({ usuarioLogado }) {
               Adicionar função
             </h3>
 
-            <form onSubmit={adicionarFuncao} className="space-y-4">
+            <form onSubmit={handleAdicionarFuncao} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Departamento
@@ -501,7 +348,7 @@ function Departamentos({ usuarioLogado }) {
 
                   {podeExcluirDepartamento && (
                     <button
-                      onClick={() => excluirDepartamento(dep.id)}
+                      onClick={() => handleExcluirDepartamento(dep.id)}
                       className="self-start text-sm px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition"
                     >
                       Excluir departamento
@@ -538,7 +385,7 @@ function Departamentos({ usuarioLogado }) {
 
                           {podeGerenciarFuncoes && (
                             <button
-                              onClick={() => excluirFuncao(funcao.id)}
+                              onClick={() => handleExcluirFuncao(funcao.id)}
                               className="self-start md:self-center text-xs px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition"
                             >
                               Excluir função
