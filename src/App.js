@@ -22,7 +22,9 @@ function App() {
       const tokenSalvo = localStorage.getItem("token");
 
       if (usuarioSalvo && tokenSalvo) {
-        setUsuario(JSON.parse(usuarioSalvo));
+        const usuarioParseado = JSON.parse(usuarioSalvo);
+        console.log("Usuário recuperado da sessão:", usuarioParseado);
+        setUsuario(usuarioParseado);
       }
     } catch (error) {
       console.error("Erro ao recuperar sessão:", error);
@@ -35,6 +37,8 @@ function App() {
 
   const handleLogin = (dadosLogin) => {
     const usuarioRecebido = dadosLogin?.usuario ?? dadosLogin;
+
+    console.log("Usuário recebido no App:", usuarioRecebido);
 
     setUsuario(usuarioRecebido);
     setPaginaAtual("Administracao");
@@ -64,23 +68,23 @@ function App() {
       case "Dashboard":
         return <Dashboard usuarioLogado={usuario} />;
       case "Estoque":
-        return <Estoque />;
+        return <Estoque usuarioLogado={usuario} />;
       case "Entradas":
-        return <Entradas />;
+        return <Entradas usuarioLogado={usuario} />;
       case "Entregas":
-        return <Entregas />;
+        return <Entregas usuarioLogado={usuario} />;
       case "Devoluções":
-        return <Devolucoes />;
+        return <Devolucoes usuarioLogado={usuario} />;
       case "Funcionários":
         return <Funcionarios usuarioLogado={usuario} />;
       case "Departamentos":
         return <Departamentos usuarioLogado={usuario} />;
       case "Fornecedores":
-        return <Fornecedores />;
+        return <Fornecedores usuarioLogado={usuario} />;
       case "Administracao":
-        return <Administracao />;
+        return <Administracao usuarioLogado={usuario} />;
       default:
-        return <Administracao />;
+        return <Administracao usuarioLogado={usuario} />;
     }
   };
 
