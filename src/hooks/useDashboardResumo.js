@@ -53,7 +53,7 @@ export function useDashboardResumo() {
       ] = await Promise.all([
         buscarPrimeiraLista(["/epis-dashbord"]),
         buscarPrimeiraLista(["/tamanhos"]),
-        buscarPrimeiraLista(["/funcionarios"]),
+        buscarPrimeiraLista(["/funcionarios-dashbord"]),
         buscarPrimeiraLista(["/entradas"]),
         buscarPrimeiraLista(["/entregas"]), 
       ]);
