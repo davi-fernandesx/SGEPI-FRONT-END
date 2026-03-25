@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
 
-import {
-  mockEpis,
-  mockTamanhos,
-  mockFuncionarios,
-  mockEntradas,
-  mockEntregas,
-  mockItensEntregues,
-  mockDevolucoes,
-} from "../mocks/dashboardMocks";
-
 import { obterHojeISO, formatarData } from "../utils/dashboardFormatters";
 
 import {
@@ -20,7 +10,6 @@ import {
   normalizarEntrada,
   normalizarEntrega,
   normalizarItemEntregue,
-  normalizarDevolucao,
 } from "../utils/dashboardNormalizers";
 
 function extrairLista(resp, fallback = []) {
@@ -28,17 +17,17 @@ function extrairLista(resp, fallback = []) {
   return Array.isArray(dados) ? dados : fallback;
 }
 
-async function buscarPrimeiraLista(rotas, fallback = []) {
+async function buscarPrimeiraLista(rotas) {
   for (const rota of rotas) {
     try {
       const resp = await api.get(rota);
-      const lista = extrairLista(resp, fallback);
+      const lista = extrairLista(resp, []);
       if (Array.isArray(lista)) return lista;
     } catch (erro) {
       // tenta próxima rota
     }
   }
-  return fallback;
+  return [];
 }
 
 export function useDashboardResumo() {
@@ -48,7 +37,6 @@ export function useDashboardResumo() {
   const [entradas, setEntradas] = useState([]);
   const [entregas, setEntregas] = useState([]);
   const [itensEntregues, setItensEntregues] = useState([]);
-  const [devolucoes, setDevolucoes] = useState([]);
   const [carregandoResumo, setCarregandoResumo] = useState(true);
 
   const carregarResumo = async () => {
@@ -62,33 +50,31 @@ export function useDashboardResumo() {
         listaEntradas,
         listaEntregas,
         listaItensEntregues,
-        listaDevolucoes,
       ] = await Promise.all([
-        buscarPrimeiraLista(["/epis", "/epi", "/produtos"], mockEpis),
-        buscarPrimeiraLista(["/tamanhos", "/tamanho"], mockTamanhos),
-        buscarPrimeiraLista(["/funcionarios"], mockFuncionarios),
-        buscarPrimeiraLista(
-          ["/entrada-epi", "/entrada_epi", "/entradas"],
-          mockEntradas
-        ),
-        buscarPrimeiraLista(
-          ["/entrega-epi", "/entrega_epi", "/entregas"],
-          mockEntregas
-        ),
-        buscarPrimeiraLista(
-          ["/epis-entregues", "/epis_entregues"],
-          mockItensEntregues
-        ),
-        buscarPrimeiraLista(["/devolucoes", "/devolucao"], mockDevolucoes),
+        buscarPrimeiraLista(["/epis-dashbord"]),
+        buscarPrimeiraLista(["/tamanhos"]),
+        buscarPrimeiraLista(["/funcionarios"]),
+        buscarPrimeiraLista(["/entradas"]),
+        buscarPrimeiraLista(["/entregas"]), 
       ]);
 
-      setEpis(listaEpis.map(normalizarEpi));
-      setTamanhos(listaTamanhos.map(normalizarTamanho));
-      setFuncionarios(listaFuncionarios.map(normalizarFuncionario));
-      setEntradas(listaEntradas.map(normalizarEntrada));
-      setEntregas(listaEntregas.map(normalizarEntrega));
-      setItensEntregues(listaItensEntregues.map(normalizarItemEntregue));
-      setDevolucoes(listaDevolucoes.map(normalizarDevolucao));
+      // ======== AQUI ESTÃO OS LOGS ========
+      console.log("📦 DADOS BRUTOS DA API:");
+      console.log("EPIs:", listaEpis);
+      console.log("Tamanhos:", listaTamanhos);
+      console.log("Funcionários:", listaFuncionarios);
+      console.log("Entradas:", listaEntradas);
+      console.log("Entregas:", listaEntregas);
+      console.log("Itens Entregues:", listaItensEntregues);
+      console.log("=================================");
+
+      setEpis((listaEpis || []).map(normalizarEpi));
+      setTamanhos((listaTamanhos || []).map(normalizarTamanho));
+      setFuncionarios((listaFuncionarios || []).map(normalizarFuncionario));
+      setEntradas((listaEntradas || []).map(normalizarEntrada));
+      setEntregas((listaEntregas || []).map(normalizarEntrega));
+      setItensEntregues((listaItensEntregues || []).map(normalizarItemEntregue));
+      
     } finally {
       setCarregandoResumo(false);
     }
@@ -288,11 +274,6 @@ export function useDashboardResumo() {
       (entrega) => String(entrega.data_entrega || "").substring(0, 10) === hoje
     ).length;
 
-    const devolucoesHoje = devolucoes.filter(
-      (devolucao) =>
-        String(devolucao.data_devolucao || "").substring(0, 10) === hoje
-    ).length;
-
     const valorTotal = entradas.reduce(
       (acc, entrada) =>
         acc +
@@ -306,11 +287,10 @@ export function useDashboardResumo() {
     return {
       totalItens,
       entregasHoje,
-      devolucoesHoje,
       alertas,
       valorTotal,
     };
-  }, [entradas, entregas, devolucoes, alertasDetalhados]);
+  }, [entradas, entregas, alertasDetalhados]);
 
   return {
     epis,
