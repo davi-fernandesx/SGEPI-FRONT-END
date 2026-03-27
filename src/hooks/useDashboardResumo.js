@@ -10,6 +10,7 @@ import {
   normalizarEntrada,
   normalizarEntrega,
   normalizarItemEntregue,
+  normalizarDevolucao, // <-- Descomentado
 } from "../utils/dashboardNormalizers";
 
 function extrairLista(resp, fallback = []) {
@@ -37,6 +38,7 @@ export function useDashboardResumo() {
   const [entradas, setEntradas] = useState([]);
   const [entregas, setEntregas] = useState([]);
   const [itensEntregues, setItensEntregues] = useState([]);
+  const [devolucoes, setDevolucoes] = useState([]); // <-- Descomentado
   const [carregandoResumo, setCarregandoResumo] = useState(true);
 
   const carregarResumo = async () => {
@@ -50,15 +52,18 @@ export function useDashboardResumo() {
         listaEntradas,
         listaEntregas,
         listaItensEntregues,
+        listaDevolucoes, // <-- Descomentado
       ] = await Promise.all([
         buscarPrimeiraLista(["/epis-dashbord"]),
         buscarPrimeiraLista(["/tamanhos"]),
         buscarPrimeiraLista(["/funcionarios-dashbord"]),
-        buscarPrimeiraLista(["/entradas"]),
-        buscarPrimeiraLista(["/entregas"]), 
+        buscarPrimeiraLista(["/entradas-dashbord"]),
+        buscarPrimeiraLista(["/entregas-dashbord"]), 
+        buscarPrimeiraLista(["/entrega-itens-dashbord"]),
+        buscarPrimeiraLista(["/devolucoes"]), // <-- Descomentado e adicionado à API
       ]);
 
-      // ======== AQUI ESTÃO OS LOGS ========
+      // ======== LOGS ATUALIZADOS ========
       console.log("📦 DADOS BRUTOS DA API:");
       console.log("EPIs:", listaEpis);
       console.log("Tamanhos:", listaTamanhos);
@@ -66,6 +71,7 @@ export function useDashboardResumo() {
       console.log("Entradas:", listaEntradas);
       console.log("Entregas:", listaEntregas);
       console.log("Itens Entregues:", listaItensEntregues);
+      console.log("Devoluções:", listaDevolucoes);
       console.log("=================================");
 
       setEpis((listaEpis || []).map(normalizarEpi));
@@ -74,7 +80,8 @@ export function useDashboardResumo() {
       setEntradas((listaEntradas || []).map(normalizarEntrada));
       setEntregas((listaEntregas || []).map(normalizarEntrega));
       setItensEntregues((listaItensEntregues || []).map(normalizarItemEntregue));
-      
+      setDevolucoes((listaDevolucoes || []).map(normalizarDevolucao)); // <-- Descomentado
+
     } finally {
       setCarregandoResumo(false);
     }
@@ -151,49 +158,56 @@ export function useDashboardResumo() {
       });
   }, [entradas, episMap, tamanhosMap]);
 
+  // ======= BLOCO CORRIGIDO: entregasHojeDetalhadas =======
   const entregasHojeDetalhadas = useMemo(() => {
-    const hoje = obterHojeISO();
+    const hojeISO = obterHojeISO(); // ex: "2026-03-26"
+    const [ano, mes, dia] = hojeISO.split("-");
+    const hojeBR = `${dia}/${mes}/${ano}`; // ex: "26/03/2026"
+    
     const linhas = [];
 
-    const entregasDoDia = entregas.filter(
-      (entrega) => String(entrega.data_entrega || "").substring(0, 10) === hoje
-    );
+    // 1. Filtra as entregas aceitando tanto ISO quanto BR
+    const entregasDoDia = entregas.filter((entrega) => {
+      const dataEntrega = String(entrega.data_entrega || "").substring(0, 10);
+      return dataEntrega === hojeISO || dataEntrega === hojeBR;
+    });
 
+    // 2. Para cada entrega de hoje...
     entregasDoDia.forEach((entrega) => {
       const funcionario = funcionariosMap[Number(entrega.idFuncionario)];
-      const itensDaEntrega =
-        itensEntreguesPorEntrega[Number(entrega.id)] || [];
+      
+      // Busca os itens que pertencem a esta entrega
+      const itensDaEntrega = itensEntreguesPorEntrega[Number(entrega.id)] || [];
 
+      // Se a entrega foi registrada mas nenhum item foi vinculado
       if (itensDaEntrega.length === 0) {
         linhas.push({
-          id: `sem-item-${entrega.id}`,
+          id: `vazio-${entrega.id}`,
           data: formatarData(entrega.data_entrega),
-          funcionario: funcionario?.nome || "Funcionário não identificado",
+          funcionario: funcionario?.nome || "Desconhecido",
           matricula: funcionario?.matricula || "--",
-          item: "Sem item vinculado",
+          item: "Aguardando item...",
           tamanho: "-",
           quantidade: 0,
         });
-      } else {
-        itensDaEntrega.forEach((itemEntregue, index) => {
-          const epi = episMap[Number(itemEntregue.idEpi)];
-          const tamanho = tamanhosMap[Number(itemEntregue.idTamanho)];
-
-          linhas.push({
-            id: `${entrega.id}-${index}-${itemEntregue.id}`,
-            data: formatarData(entrega.data_entrega),
-            funcionario: funcionario?.nome || "Funcionário não identificado",
-            matricula: funcionario?.matricula || "--",
-            item:
-              itemEntregue.epiNome ||
-              epi?.nome ||
-              `EPI #${itemEntregue.idEpi || "--"}`,
-            tamanho:
-              itemEntregue.tamanhoTexto || tamanho?.tamanho || "Sem tamanho",
-            quantidade: Number(itemEntregue.quantidade || 0),
-          });
-        });
+        return; 
       }
+
+      // Se a entrega tem itens, gera uma linha para CADA item
+      itensDaEntrega.forEach((itemEntregue, index) => {
+        const epi = episMap[Number(itemEntregue.idEpi)];
+        const tamanho = tamanhosMap[Number(itemEntregue.idTamanho)];
+
+        linhas.push({
+          id: `${entrega.id}-item-${index}`,
+          data: formatarData(entrega.data_entrega),
+          funcionario: funcionario?.nome || "Desconhecido",
+          matricula: funcionario?.matricula || "--",
+          item: itemEntregue.epiNome || epi?.nome || `EPI #${itemEntregue.idEpi || "?"}`,
+          tamanho: itemEntregue.tamanhoTexto || tamanho?.tamanho || "?",
+          quantidade: Number(itemEntregue.quantidade || 0),
+        });
+      });
     });
 
     return linhas.sort((a, b) => a.funcionario.localeCompare(b.funcionario));
@@ -261,18 +275,28 @@ export function useDashboardResumo() {
       .filter((item) => Number(item.quantidade) > 0)
       .sort((a, b) => b.valorTotal - a.valorTotal);
   }, [entradas, episMap, tamanhosMap]);
-
+  // ======= BLOCO CORRIGIDO: resumo =======
   const resumo = useMemo(() => {
-    const hoje = obterHojeISO();
+    const hojeISO = obterHojeISO();
+    const [ano, mes, dia] = hojeISO.split("-");
+    const hojeBR = `${dia}/${mes}/${ano}`; 
 
     const totalItens = entradas.reduce(
       (acc, entrada) => acc + Number(entrada.quantidadeAtual || 0),
       0
     );
 
-    const entregasHoje = entregas.filter(
-      (entrega) => String(entrega.data_entrega || "").substring(0, 10) === hoje
-    ).length;
+    // Atualizado com a verificação dupla
+    const entregasHoje = entregas.filter((entrega) => {
+      const data = String(entrega.data_entrega || "").substring(0, 10);
+      return data === hojeISO || data === hojeBR;
+    }).length;
+
+    // Atualizado com a verificação dupla
+    const devolucoesHoje = devolucoes.filter((devolucao) => {
+      const data = String(devolucao.data_devolucao || "").substring(0, 10);
+      return data === hojeISO || data === hojeBR;
+    }).length;
 
     const valorTotal = entradas.reduce(
       (acc, entrada) =>
@@ -287,10 +311,11 @@ export function useDashboardResumo() {
     return {
       totalItens,
       entregasHoje,
+      devolucoesHoje,
       alertas,
       valorTotal,
     };
-  }, [entradas, entregas, alertasDetalhados]);
+  }, [entradas, entregas, devolucoes, alertasDetalhados]);
 
   return {
     epis,

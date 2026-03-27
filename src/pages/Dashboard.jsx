@@ -280,7 +280,7 @@ function Dashboard({ usuarioLogado }) {
   }
 
   return (
-    <div className="animate-fade-in pb-20 md:pb-0">
+    <div className="animate-fade-in overflow-x-hidden pb-20 md:pb-0">
       <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
