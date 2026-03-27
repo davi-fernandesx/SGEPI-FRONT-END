@@ -1,3 +1,19 @@
+// TRADUTOR DE DATA GO -> REACT
+export function converterDataParaISO(dataBruta) {
+  if (!dataBruta) return null;
+  
+  const dataStr = String(dataBruta).substring(0, 10);
+  
+  // Se a API Go mandou no formato DD/MM/YYYY, inverte para YYYY-MM-DD
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) {
+    const [dia, mes, ano] = dataStr.split("/");
+    return `${ano}-${mes}-${dia}`;
+  }
+  
+  return dataStr; // Se já vier em ISO, só devolve normal
+}
+
+
 export function normalizarEpi(item) {
   return {
     id: Number(item?.id ?? 0),
@@ -31,7 +47,9 @@ export function normalizarEntrada(item) {
     // Os campos abaixo não são estritamente usados para os cálculos do dashboard principal, 
     // mas mantive caso você os use dentro dos modais de detalhes
     quantidade: Number(item?.quantidade ?? 0),
-    data_entrada: String(item?.data_entrada ?? ""),
+    data_entrada: converterDataParaISO(
+      item?.data_entrada ?? item?.dataEntrada ?? item?.data_registro
+    ),
     lote: String(item?.lote ?? ""),
   };
 }
@@ -40,7 +58,9 @@ export function normalizarEntrega(item) {
   return {
     id: Number(item?.id ?? 0),
     idFuncionario: Number(item?.idFuncionario ?? 0),
-    data_entrega: String(item?.data_entrega ?? ""),
+    data_entrega: converterDataParaISO(
+      item?.data_entrega ?? item?.dataEntrega ?? item?.data_entrega_epi ?? item?.data
+    ),
     // Mantido para os modais, caso você use
     assinatura: item?.assinatura ?? null,
     token_validacao: item?.token_validacao ?? null,
@@ -60,6 +80,8 @@ export function normalizarItemEntregue(item) {
 export function normalizarDevolucao(item) {
   return {
     id: Number(item?.id ?? 0),
-    data_devolucao: String(item?.data_devolucao ?? ""),
+    data_devolucao: converterDataParaISO(
+      item?.data_devolucao ?? item?.dataDevolucao ?? item?.data
+    ),
   };
 }
