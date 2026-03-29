@@ -1,256 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../services/api";
 import { temPermissao } from "../utils/permissoes";
-
-// Caso mockFornecedores venha de outro arquivo, você pode importar aqui. 
-// Deixei um array vazio por padrão para evitar erros caso não exista no seu código.
-const mockFornecedores = []; 
-
-function extrairLista(resp, fallback = []) {
-  const dados = resp?.data ?? resp ?? fallback;
-  return Array.isArray(dados) ? dados : fallback;
-}
-
-async function buscarPrimeiraLista(rotas, fallback = []) {
-  for (const rota of rotas) {
-    try {
-      const resp = await api.get(rota);
-      const lista = extrairLista(resp, fallback);
-      if (Array.isArray(lista)) return lista;
-    } catch (erro) {
-      // tenta próxima rota
-    }
-  }
-  return fallback;
-}
-
-function normalizarFornecedor(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? Date.now()),
-    razao_social:
-      item?.razao_social ??
-      item?.razaoSocial ??
-      item?.razao ??
-      item?.nome ??
-      "",
-    nome_fantasia:
-      item?.nome_fantasia ??
-      item?.nomeFantasia ??
-      item?.fantasia ??
-      "",
-    cnpj: item?.cnpj ?? "",
-    inscricao_estadual:
-      item?.inscricao_estadual ??
-      item?.inscricaoEstadual ??
-      item?.ie ??
-      "",
-  };
-}
-
-function ModalDetalhesFornecedor({ aberto, fornecedor, onClose }) {
-  if (!aberto || !fornecedor) return null;
-
-  return (
-    <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold">Detalhes do fornecedor</h3>
-              <p className="text-sm text-slate-200 mt-1">
-                Informações completas do cadastro.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-white/10 hover:bg-white/20 transition rounded-lg px-3 py-2 text-sm font-bold"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <span className="text-[11px] uppercase tracking-wide text-slate-500 font-bold block mb-1">
-              Razão social
-            </span>
-            <strong className="text-slate-800">
-              {fornecedor.razao_social || "-"}
-            </strong>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-bold block mb-1">
-                Nome fantasia
-              </span>
-              <strong className="text-slate-800">
-                {fornecedor.nome_fantasia || "-"}
-              </strong>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-bold block mb-1">
-                CNPJ
-              </span>
-              <strong className="text-slate-800 font-mono">
-                {fornecedor.cnpj || "-"}
-              </strong>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-bold block mb-1">
-                Inscrição estadual
-              </span>
-              <strong className="text-slate-800">
-                {fornecedor.inscricao_estadual || "-"}
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold hover:bg-slate-900 transition"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModalCriarFornecedor({ aberto, onClose, onSucesso }) {
-  const [razaoSocial, setRazaoSocial] = useState("");
-  const [nomeFantasia, setNomeFantasia] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [inscricaoEstadual, setInscricaoEstadual] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState("");
-
-  if (!aberto) return null;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErro("");
-
-    if (!razaoSocial.trim()) {
-      setErro("A Razão Social é obrigatória.");
-      return;
-    }
-
-    try {
-      setSalvando(true);
-      await api.post("/fornecedores", {
-        razao_social: razaoSocial,
-        nome_fantasia: nomeFantasia,
-        cnpj: cnpj,
-        inscricao_estadual: inscricaoEstadual,
-      });
-
-      setRazaoSocial("");
-      setNomeFantasia("");
-      setCnpj("");
-      setInscricaoEstadual("");
-      
-      onSucesso();
-      onClose();
-    } catch (err) {
-
-      // 👇 COLOQUE OS CONSOLE.LOG AQUI 👇
-      console.error("❌ ERRO AO SALVAR FORNECEDOR:", err);
-      console.log("Detalhes extras do erro:", err?.message);
-      setErro(err?.message || "Erro ao salvar o fornecedor.");
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white px-6 py-5 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-bold">Novo Fornecedor</h3>
-            <p className="text-sm text-indigo-100 mt-1">Cadastre um novo fornecedor no sistema.</p>
-          </div>
-          <button type="button" onClick={onClose} className="bg-white/10 hover:bg-white/20 transition rounded-lg px-3 py-2 text-sm font-bold">
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {erro && (
-            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg border border-red-100 font-medium">
-              ⚠️ {erro}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Razão Social *</label>
-            <input
-              type="text"
-              required
-              value={razaoSocial}
-              onChange={(e) => setRazaoSocial(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="Ex: Empresa Silva LTDA"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Fantasia</label>
-            <input
-              type="text"
-              value={nomeFantasia}
-              onChange={(e) => setNomeFantasia(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="Ex: Mercadinho Silva"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CNPJ</label>
-              <input
-                type="text"
-                value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
-                placeholder="00.000.000/0000-00"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Insc. Estadual</label>
-              <input
-                type="text"
-                value={inscricaoEstadual}
-                onChange={(e) => setInscricaoEstadual(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="000.000.000.000"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 gap-2 border-t border-slate-100 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition">
-              Cancelar
-            </button>
-            <button type="submit" disabled={salvando} className={`px-4 py-2 rounded-xl text-white font-bold transition ${salvando ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}>
-              {salvando ? "Salvando..." : "Salvar Fornecedor"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+import { listarFornecedores } from "../services/fornecedorService";
+import { normalizarFornecedor } from "../utils/fornecedorNormalizer";
+import ModalCriarFornecedor from "../components/modals/ModalCriarFornecedor";
+import ModalDetalhesFornecedor from "../components/modals/ModalDetalhesFornecedor";
 
 function Fornecedores({ usuarioLogado }) {
   const [fornecedores, setFornecedores] = useState([]);
@@ -259,31 +12,27 @@ function Fornecedores({ usuarioLogado }) {
   const [carregando, setCarregando] = useState(true);
   const [erroTela, setErroTela] = useState("");
   const [fornecedorDetalhe, setFornecedorDetalhe] = useState(null);
-  
-  // Novo estado para controlar o modal de criação
   const [modalCriarAberto, setModalCriarAberto] = useState(false);
 
   const itensPorPagina = 6;
 
-  const podeVisualizar = temPermissao(usuarioLogado, "visualizar_fornecedores");
+  const podeVisualizar = temPermissao(
+    usuarioLogado,
+    "visualizar_fornecedores"
+  );
 
-  // Função separada do useEffect para poder ser chamada após salvar um novo fornecedor
   const carregarFornecedores = async () => {
     setCarregando(true);
     setErroTela("");
 
     try {
-      const lista = await buscarPrimeiraLista(
-        ["/fornecedores", "/fornecedor"],
-        mockFornecedores
-      );
-
+      const lista = await listarFornecedores();
       setFornecedores(lista.map(normalizarFornecedor));
     } catch (erro) {
       setErroTela(
         erro?.message || "Não foi possível carregar a lista de fornecedores."
       );
-      setFornecedores(mockFornecedores.map(normalizarFornecedor));
+      setFornecedores([]);
     } finally {
       setCarregando(false);
     }
@@ -317,7 +66,10 @@ function Fornecedores({ usuarioLogado }) {
       1,
       Math.ceil(fornecedoresFiltrados.length / itensPorPagina)
     );
-    if (paginaAtual > total) setPaginaAtual(total);
+
+    if (paginaAtual > total) {
+      setPaginaAtual(total);
+    }
   }, [paginaAtual, fornecedoresFiltrados.length]);
 
   const totalPaginas = Math.max(
@@ -373,9 +125,8 @@ function Fornecedores({ usuarioLogado }) {
               Visualize os fornecedores cadastrados no sistema.
             </p>
           </div>
-          
-          {/* Botão Novo Fornecedor Adicionado Aqui */}
-          <button 
+
+          <button
             onClick={() => setModalCriarAberto(true)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-md"
           >
@@ -577,11 +328,10 @@ function Fornecedores({ usuarioLogado }) {
         onClose={() => setFornecedorDetalhe(null)}
       />
 
-      {/* Modal de Criação Adicionado Aqui */}
       <ModalCriarFornecedor
         aberto={modalCriarAberto}
         onClose={() => setModalCriarAberto(false)}
-        onSucesso={() => carregarFornecedores()}
+        onSucesso={carregarFornecedores}
       />
     </>
   );
