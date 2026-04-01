@@ -890,7 +890,7 @@ function ModalEntrega({ onClose, onSalvar }) {
     setItensParaEntregar((prev) => prev.filter((item) => item.id !== id));
   }
 
-  async function salvarEntrega() {
+async function salvarEntrega() {
     if (!funcionario) {
       alert("Selecione o funcionário.");
       return;
@@ -907,83 +907,47 @@ function ModalEntrega({ onClose, onSalvar }) {
     }
 
     setCarregando(true);
+     const tokenValidacao = gerarTokenValidacaoEntrega();
 
-    const tokenValidacao = gerarTokenValidacaoEntrega();
-
-    const itensNormalizados = itensParaEntregar.map((item) => ({
-      id: item.id,
-      idEpi: Number(item.idEpi),
-      idTamanho: Number(item.idTamanho),
-      quantidade: Number(item.quantidade),
-      epiNome: item.epiNome,
-      tamanhoNome: item.tamanhoNome,
-    }));
-
-    const payloadEntregaBase = {
-      idFuncionario: Number(funcionario),
-      data_entrega: dataEntrega,
-      assinatura: assinaturaPreview,
-      token_validacao: tokenValidacao,
-      itens: itensNormalizados.map((item) => ({
-        idEpi: item.idEpi,
-        idTamanho: item.idTamanho,
-        quantidade: item.quantidade,
+    // 1. Prepara o Super JSON exatamente como a struct 'EntregaParaInserir' do Go espera
+    const payloadFinal = {
+      id_funcionario: Number(funcionario),
+      id_user: 1, // DICA: Se tiver o ID do usuário logado no sistema, use-o aqui
+      data_entrega: dataEntrega, // Formato YYYY-MM-DD que o configs.DataBr do Go entende
+      assinatura_digital: assinaturaPreview, // Base64 da imagem
+      itens: itensParaEntregar.map((item) => ({
+        id_epi: Number(item.idEpi),
+        id_tamanho: Number(item.idTamanho),
+        quantidade: Number(item.quantidade),
       })),
-    };
-
-    const entregaFinal = {
-      id: Date.now(),
-      idFuncionario: Number(funcionario),
-      data_entrega: dataEntrega,
-      assinatura: assinaturaPreview,
-      token_validacao: tokenValidacao,
-      itens: itensNormalizados,
-      funcionario: Number(funcionario),
-      nome_funcionario: funcionarioSelecionado?.nome || "",
-      dataEntrega,
+      // Se o seu Go usar o Token para algo, você pode adicionar aqui, 
+      // mas as structs que você mandou não o mencionam no 'Inserir'.
     };
 
     try {
-      let respostaEntrega;
+      // 2. Faz uma única chamada para o servidor
+      const resposta = await criarEntrega(payloadFinal);
 
-      try {
-        respostaEntrega = await criarEntrega(payloadEntregaBase);
-      } catch {
-        const payloadSomenteCabecalho = {
-          idFuncionario: Number(funcionario),
-          data_entrega: dataEntrega,
-          assinatura: assinaturaPreview,
-          token_validacao: tokenValidacao,
-        };
+      // 3. Resolve o ID que voltou do banco para atualizar a tela sem precisar de F5
+      const idGerado = resolverIdEntrega(resposta);
 
-        respostaEntrega = await criarEntrega(payloadSomenteCabecalho);
-
-        const idEntregaServidor = resolverIdEntrega(respostaEntrega);
-
-        if (idEntregaServidor > 0) {
-          const itensPayload = itensNormalizados.map((item) => ({
-            idEntrega: idEntregaServidor,
-            idEpi: item.idEpi,
-            idTamanho: item.idTamanho,
-            quantidade: item.quantidade,
-          }));
-
-          await salvarItensEntrega(itensPayload);
-        }
-      }
-
-      const idEntregaFinal = resolverIdEntrega(respostaEntrega);
-      if (idEntregaFinal > 0) {
-        entregaFinal.id = idEntregaFinal;
-      }
+      const objetoParaTela = {
+        id: idGerado || Date.now(),
+        idFuncionario: Number(funcionario),
+        nome_funcionario: funcionarioSelecionado?.nome || "",
+        data_entrega: dataEntrega,
+        assinatura: assinaturaPreview,
+        itens: itensParaEntregar, // Para o Front-end mostrar os nomes (EPI, Tamanho)
+      };
 
       if (onSalvar) {
-        await onSalvar(entregaFinal);
+        await onSalvar(objetoParaTela);
       }
 
       onClose();
     } catch (erro) {
-      alert(erro?.message || "Erro ao registrar entrega.");
+      console.error("Erro ao salvar entrega:", erro);
+      alert(erro?.message || "Erro ao registrar entrega no servidor.");
     } finally {
       setCarregando(false);
     }
