@@ -1,11 +1,10 @@
- import { useState } from "react";
-// Vamos importar apenas a de departamentos por enquanto para testar
+import { useState } from "react";
 import AbaDepartamentos from "./administracao/AbaDepartamento";
 import AbaFuncoes from "./administracao/AbaFuncoes";
 import AbaFuncionarios from "./administracao/AbaFuncionario";
 import AbaEpis from "./administracao/AbaEpi";
 import AbaFornecedores from "./administracao/AbaFornecedores";
-
+import AbaColaboradores from "./administracao/AbaColaboradores";
 
 function Administracao() {
   const [abaAtiva, setAbaAtiva] = useState("departamentos");
@@ -14,8 +13,8 @@ function Administracao() {
   const [erroSenha, setErroSenha] = useState("");
 
   // Substitua pela sua lógica real
-  const adminPorPerfil = true; 
-  const adminPorPermissao = true; 
+  const adminPorPerfil = true;
+  const adminPorPermissao = true;
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 animate-fade-in max-w-full">
@@ -90,6 +89,17 @@ function Administracao() {
         </button>
 
         <button
+          onClick={() => setAbaAtiva("colaboradores")}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            abaAtiva === "colaboradores"
+              ? "bg-slate-800 text-white shadow-md"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          👤 Colaboradores
+        </button>
+
+        <button
           onClick={() => setAbaAtiva("epis")}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
             abaAtiva === "epis"
@@ -101,13 +111,13 @@ function Administracao() {
         </button>
       </div>
 
-      {/* ÁREA ONDE OS COMPONENTES SÃO RENDERIZADOS */}
       <div className="mt-4">
-        { abaAtiva === "fornecedores" && <AbaFornecedores /> }
+        {abaAtiva === "fornecedores" && <AbaFornecedores />}
         {abaAtiva === "departamentos" && <AbaDepartamentos />}
         {abaAtiva === "funcoes" && <AbaFuncoes />}
         {abaAtiva === "funcionarios" && <AbaFuncionarios />}
-        { abaAtiva === "epis" && <AbaEpis /> }
+        {abaAtiva === "colaboradores" && <AbaColaboradores />}
+        {abaAtiva === "epis" && <AbaEpis />}
       </div>
     </div>
   );

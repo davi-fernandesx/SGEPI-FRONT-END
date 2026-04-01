@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import ModalEntrega from "../components/modals/ModalEntrega";
+import ModalEntrega from "../components/modals/entregas/ModalEntrega";
 import { temPermissao } from "../utils/permissoes";
 import {
   listarEntregas,

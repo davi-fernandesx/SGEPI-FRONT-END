@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import ModalEntrada from "../components/modals/ModalEntrada";
-import ModalEntrega from "../components/modals/ModalEntrega";
+import ModalEntrega from "../components/modals/entregas/ModalEntrega";
 import ModalBaixa from "../components/modals/ModalBaixa";
 import ModalBusca from "../components/modals/ModalBusca";
 import ModalDetalhesDashboard from "../components/modals/ModalDetalhesDashboard";
