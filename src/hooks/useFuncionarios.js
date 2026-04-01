@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { carregarDadosFuncionarios } from "../services/funcionarioService";
-import { formatarData } from "../utils/funcionarios";
 
 const ITENS_POR_PAGINA = 6;
 
 export function useFuncionarios() {
+  // Entregas e Devoluções sumiram daqui!
   const [funcionarios, setFuncionarios] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [funcoes, setFuncoes] = useState([]);
-  const [entregas, setEntregas] = useState([]);
-  const [devolucoes, setDevolucoes] = useState([]);
 
   const [busca, setBusca] = useState("");
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -26,22 +24,17 @@ export function useFuncionarios() {
         const dados = await carregarDadosFuncionarios();
 
         setFuncionarios(dados.funcionarios || []);
+        // Mantemos estes dois para o Modal de Novo Funcionario usar
         setDepartamentos(dados.departamentos || []);
         setFuncoes(dados.funcoes || []);
-        setEntregas(dados.entregas || []);
-        setDevolucoes(dados.devolucoes || []);
+        
       } catch (erro) {
         setErroTela(
-          erro?.response?.data?.message ||
-            erro?.message ||
-            "Não foi possível carregar a tela de funcionários."
+          erro?.message || "Não foi possível carregar a tela de funcionários."
         );
-
         setFuncionarios([]);
         setDepartamentos([]);
         setFuncoes([]);
-        setEntregas([]);
-        setDevolucoes([]);
       } finally {
         setCarregando(false);
       }
@@ -50,49 +43,12 @@ export function useFuncionarios() {
     carregar();
   }, []);
 
-  const funcionariosResolvidos = useMemo(() => {
-    return funcionarios.map((funcionario) => {
-      const departamento = departamentos.find(
-        (dep) => Number(dep.id) === Number(funcionario.idDepartamento)
-      );
-
-      const funcao = funcoes.find(
-        (fn) => Number(fn.id) === Number(funcionario.idFuncao)
-      );
-
-      const entregasDoFuncionario = entregas.filter(
-        (entrega) => Number(entrega.idFuncionario) === Number(funcionario.id)
-      );
-
-      const devolucoesDoFuncionario = devolucoes.filter(
-        (devolucao) =>
-          Number(devolucao.idFuncionario) === Number(funcionario.id)
-      );
-
-      const datasMovimentacao = [
-        ...entregasDoFuncionario.map((item) => item.data_entrega),
-        ...devolucoesDoFuncionario.map((item) => item.data_devolucao),
-      ]
-        .filter(Boolean)
-        .sort((a, b) => String(b).localeCompare(String(a)));
-
-      return {
-        ...funcionario,
-        departamentoNome: departamento?.nome || "-",
-        funcaoNome: funcao?.nome || "-",
-        totalEntregas: entregasDoFuncionario.length,
-        totalDevolucoes: devolucoesDoFuncionario.length,
-        ultimaMovimentacao: datasMovimentacao.length
-          ? formatarData(datasMovimentacao[0])
-          : "-",
-      };
-    });
-  }, [funcionarios, departamentos, funcoes, entregas, devolucoes]);
-
+  // 🗑️ ADEUS `funcionariosResolvidos`! 
+  // O filtro agora trabalha diretamente em cima do estado `funcionarios`
   const funcionariosFiltrados = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
-    const listaOrdenada = [...funcionariosResolvidos].sort((a, b) =>
+    const listaOrdenada = [...funcionarios].sort((a, b) =>
       (a.nome || "").localeCompare(b.nome || "")
     );
 
@@ -103,28 +59,24 @@ export function useFuncionarios() {
     return listaOrdenada.filter((funcionario) => {
       return (
         (funcionario.nome || "").toLowerCase().includes(termo) ||
-        String(funcionario.matricula || "").includes(termo) ||
+        String(funcionario.matricula || "").toLowerCase().includes(termo) ||
         (funcionario.departamentoNome || "").toLowerCase().includes(termo) ||
         (funcionario.funcaoNome || "").toLowerCase().includes(termo)
       );
     });
-  }, [funcionariosResolvidos, busca]);
+  }, [funcionarios, busca]);
 
-  useEffect(() => {
-    const total = Math.max(
-      1,
-      Math.ceil(funcionariosFiltrados.length / ITENS_POR_PAGINA)
-    );
-
-    if (paginaAtual > total) {
-      setPaginaAtual(total);
-    }
-  }, [paginaAtual, funcionariosFiltrados.length]);
-
+  // A paginação também olha direto para os filtrados
   const totalPaginas = Math.max(
     1,
     Math.ceil(funcionariosFiltrados.length / ITENS_POR_PAGINA)
   );
+
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(totalPaginas);
+    }
+  }, [paginaAtual, totalPaginas]);
 
   const funcionariosVisiveis = useMemo(() => {
     const indiceFinal = paginaAtual * ITENS_POR_PAGINA;
@@ -133,16 +85,17 @@ export function useFuncionarios() {
     return funcionariosFiltrados.slice(indiceInicial, indiceFinal);
   }, [funcionariosFiltrados, paginaAtual]);
 
+  // O resumo agora olha diretamente para o estado `funcionarios`
   const resumo = useMemo(() => {
-    const totalFuncionarios = funcionariosResolvidos.length;
+    const totalFuncionarios = funcionarios.length;
 
     const departamentosAtivos = new Set(
-      funcionariosResolvidos
+      funcionarios
         .map((item) => item.departamentoNome)
-        .filter((item) => item && item !== "-")
+        .filter((item) => item && item !== "Sem departamento") // Ajuste conforme seu fallback
     ).size;
 
-    const comMovimentacao = funcionariosResolvidos.filter(
+    const comMovimentacao = funcionarios.filter(
       (item) => item.totalEntregas > 0 || item.totalDevolucoes > 0
     ).length;
 
@@ -151,7 +104,7 @@ export function useFuncionarios() {
       departamentosAtivos,
       comMovimentacao,
     };
-  }, [funcionariosResolvidos]);
+  }, [funcionarios]);
 
   function atualizarBusca(valor) {
     setBusca(valor);
@@ -192,15 +145,14 @@ export function useFuncionarios() {
     abrirDetalhes,
     fecharDetalhes,
 
+    // Retornamos os dados limpos
     funcionarios,
     departamentos,
     funcoes,
-    entregas,
-    devolucoes,
 
-    funcionariosResolvidos,
+    // Removido: funcionariosResolvidos (a View já estava usando os visiveis)
     funcionariosFiltrados,
     funcionariosVisiveis,
     resumo,
   };
-}
+} 
