@@ -9,14 +9,30 @@ export default function AbaEpis() {
   const [modalEpiAberto, setModalEpiAberto] = useState(false);
 
   // --- CARREGAMENTO DE DADOS ---
+// --- CARREGAMENTO DE DADOS ---
   const carregarEpis = async () => {
     try {
       setCarregando(true);
       const resposta = await api.get("/epis");
       
-      // Lógica de acesso direto ou via .data (conforme seu log)
-      const dadosBrutos = resposta?.Epis || resposta?.data?.Epis || [];
-      setEpis(dadosBrutos);
+      // Pega a lista do envelope 'Epis'
+      const listaBruta = resposta?.Epis || resposta?.data?.Epis || [];
+      
+      // LOG DE CONTROLE
+      console.log("Dados recebidos do Back-end:", listaBruta);
+
+      // MAPEAMENTO: Ajusta as chaves do Go para o padrão que o seu JSX usa
+      const dadosNormalizados = listaBruta.map(epi => ({
+        ...epi,
+        // O log mostrou 'CA'. Vamos garantir que o React veja 'ca'
+        ca: epi.CA || epi.ca || "N/A",
+        
+        // No Go o campo costuma ser 'ValidadeCa' ou 'validade_CA'
+        // Ajustamos para 'data_validadeCa' que é o que seu JSX usa
+        data_validadeCa: epi.ValidadeCa || epi.validade_CA || epi.data_validadeCa || "---"
+      }));
+
+      setEpis(dadosNormalizados);
     } catch (erro) {
       console.error("Erro ao carregar EPIs:", erro);
       setEpis([]); 
@@ -34,15 +50,15 @@ export default function AbaEpis() {
     carregarEpis();
   }, []);
 
-  // --- LÓGICA DE FILTRO ---
-  const episFiltrados = useMemo(() => {
+const episFiltrados = useMemo(() => {
     const termo = buscaEpi.toLowerCase().trim();
     if (!termo) return epis;
 
     return epis.filter((epi) => (
       (epi?.nome || "").toLowerCase().includes(termo) ||
       (epi?.fabricante || "").toLowerCase().includes(termo) ||
-      (epi?.ca || "").toLowerCase().includes(termo) ||
+      // Agora usamos o 'ca' que normalizamos acima
+      String(epi?.ca || "").toLowerCase().includes(termo) ||
       (epi?.protecao?.nome || "").toLowerCase().includes(termo)
     ));
   }, [epis, buscaEpi]);
