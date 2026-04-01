@@ -17,17 +17,25 @@ import {
 function formatarData(data) {
   if (!data) return "--";
 
-  const texto = String(data).substring(0, 10);
+  // 1. Se já estiver no formato DD/MM/AAAA (vinda do Go configs.DataBr)
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(data)) {
+    return data;
+  }
 
+  // 2. Se vier no formato ISO do banco (AAAA-MM-DD...)
+  const texto = String(data).substring(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
     const [ano, mes, dia] = texto.split("-");
     return `${dia}/${mes}/${ano}`;
   }
 
+  // 3. Fallback para outros formatos de objeto Date
   const dataObj = new Date(data);
-  if (Number.isNaN(dataObj.getTime())) return "--";
+  if (!isNaN(dataObj.getTime())) {
+    return dataObj.toLocaleDateString("pt-BR");
+  }
 
-  return dataObj.toLocaleDateString("pt-BR");
+  return data; // Se nada funcionar, retorna o que veio em vez de esconder
 }
 
 function resumirItens(entrega) {
@@ -167,12 +175,22 @@ function Entregas({ usuarioLogado }) {
   }, [entregasResolvidas, busca]);
 
   const entregasOrdenadas = useMemo(() => {
-    return [...entregasFiltradas].sort((a, b) => {
-      if ((a.data_entrega || "") < (b.data_entrega || "")) return 1;
-      if ((a.data_entrega || "") > (b.data_entrega || "")) return -1;
-      return Number(b.id || 0) - Number(a.id || 0);
-    });
-  }, [entregasFiltradas]);
+  return [...entregasFiltradas].sort((a, b) => {
+    // Função auxiliar para transformar "26/03/2026" em "20260326" para comparar números
+    const converterParaSort = (d) => {
+      if (!d || !d.includes('/')) return 0;
+      const [dia, mes, ano] = d.split('/');
+      return Number(ano + mes + dia);
+    };
+
+    const dataA = converterParaSort(a.data_entrega);
+    const dataB = converterParaSort(b.data_entrega);
+
+    if (dataA !== dataB) return dataB - dataA; // Data mais recente primeiro
+    
+    return Number(b.id || 0) - Number(a.id || 0); // Critério de desempate por ID
+  });
+}, [entregasFiltradas]);
 
   const resumoTela = useMemo(() => {
     return {

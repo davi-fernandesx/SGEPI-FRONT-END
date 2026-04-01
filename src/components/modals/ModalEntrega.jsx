@@ -907,7 +907,7 @@ async function salvarEntrega() {
     }
 
     setCarregando(true);
-     const tokenValidacao = gerarTokenValidacaoEntrega();
+    const tokenValidacao = gerarTokenValidacaoEntrega();
 
     // 1. Prepara o Super JSON exatamente como a struct 'EntregaParaInserir' do Go espera
     const payloadFinal = {
