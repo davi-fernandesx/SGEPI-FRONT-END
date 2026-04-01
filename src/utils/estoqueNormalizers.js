@@ -1,81 +1,23 @@
-export function normalizarTipoProtecao(item) {
+// novo estoqueNormalizers.js
+export function normalizarEntradaCompleta(item) {
   return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    nome: item?.nome ?? item?.Nome ?? item?.descricao ?? "",
-  };
-}
-
-export function normalizarTamanho(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    tamanho: String(item?.tamanho ?? item?.Tamanho ?? ""),
-  };
-}
-
-export function normalizarEpi(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    nome: item?.nome ?? item?.Nome ?? "",
-    fabricante: item?.fabricante ?? item?.Fabricante ?? "",
-    CA: item?.CA ?? item?.ca ?? item?.Ca ?? "",
-    descricao: item?.descricao ?? item?.Descricao ?? "",
-    validade_CA:
-      item?.validade_CA ??
-      item?.validadeCA ??
-      item?.validade_ca ??
-      item?.ValidadeCA ??
-      null,
-    idTipoProtecao: Number(
-      item?.idTipoProtecao ??
-        item?.tipo_protecao_id ??
-        item?.tipoProtecaoId ??
-        item?.categoria?.id ??
-        item?.categoria ??
-        item?.id_tipo_protecao ??
-        0
-    ),
-    alerta_minimo: Number(
-      item?.alerta_minimo ?? item?.alertaMinimo ?? item?.AlertaMinimo ?? 0
-    ),
-  };
-}
-
-export function normalizarEntrada(item) {
-  return {
-    id: Number(item?.id ?? item?.ID ?? 0),
-    idEpi: Number(
-      item?.idEpi ??
-        item?.epi_id ??
-        item?.idProduto ??
-        item?.produto_id ??
-        item?.id_produto ??
-        item?.epi?.id ??
-        item?.produto?.id ??
-        0
-    ),
-    idTamanho: Number(
-      item?.idTamanho ??
-        item?.tamanho_id ??
-        item?.id_tamanho ??
-        item?.tamanho?.id ??
-        0
-    ),
-    data_entrada: item?.data_entrada ?? item?.dataEntrada ?? null,
-    quantidade: Number(item?.quantidade ?? 0),
-    quantidadeAtual: Number(
-      item?.quantidadeAtual ??
-        item?.quantidade_atual ??
-        item?.estoqueAtual ??
-        item?.estoque_atual ??
-        item?.quantidade ??
-        0
-    ),
-    data_fabricacao: item?.data_fabricacao ?? item?.dataFabricacao ?? null,
-    data_validade:
-      item?.data_validade ?? item?.dataValidade ?? item?.validade ?? null,
-    lote: item?.lote ?? "",
-    valor_unitario: Number(
-      item?.valor_unitario ?? item?.valorUnitario ?? item?.preco ?? 0
-    ),
+    id: item?.id ?? 0,
+    lote: item?.lote ?? "-",
+    quantidadeInicial: item?.quantidade_inicial ?? 0,
+    quantidadeAtual: item?.quantidade_atual ?? 0,
+    preco: item?.valor_unitario ?? 0,
+    validade: item?.data_validade ?? item?.epi?.validade_ca ?? null,
+    
+    // Pegando direto dos objetos aninhados
+    tamanho: item?.tamanho?.tamanho ?? "-",
+    nome: item?.epi?.nome ?? "EPI sem nome",
+    fabricante: item?.epi?.fabricante ?? "-",
+    ca: item?.epi?.ca ?? "-",
+    descricao: item?.epi?.descricao ?? "",
+    alertaMinimo: item?.epi?.alerta_minimo ?? 0,
+    tipoProtecao: item?.epi?.protecao?.nome ?? "-",
+    
+    // Calculado no front
+    valorTotal: (item?.quantidade_atual ?? 0) * (item?.valor_unitario ?? 0)
   };
 }
