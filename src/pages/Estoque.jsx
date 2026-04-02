@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ModalNovoEpi from "../components/modals/ModalNovoEpi";
 import ModalDetalhesEstoque from "../components/modals/ModalDetalhesEstoque";
-import { api } from "../services/api"; // Lembre-se de importar sua api aqui, já que estamos chamando direto nela agora
+import { api } from "../services/api";
 import { temPermissao } from "../utils/permissoes";
 import {
   calcularStatusValidade,
@@ -14,10 +14,32 @@ import {
 } from "../utils/estoqueHelpers";
 import { normalizarEntradaCompleta } from "../utils/estoqueNormalizers";
 
-function Estoque({ usuarioLogado }) {
-  // ✅ Apagamos epis, tiposProtecao e tamanhos! Só sobrou o que importa:
-  const [entradas, setEntradas] = useState([]);
+function getAlertaValidade(status) {
+  if (status === "vencido") {
+    return {
+      texto: "Validade vencida",
+      classe: "bg-red-50 text-red-700 border-red-200",
+      icone: "⚠️",
+    };
+  }
 
+  if (status === "proximo" || status === "proximo_vencimento") {
+    return {
+      texto: "Próximo do vencimento",
+      classe: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      icone: "🟡",
+    };
+  }
+
+  return {
+    texto: "Dentro da validade",
+    classe: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icone: "✅",
+  };
+}
+
+function Estoque({ usuarioLogado }) {
+  const [entradas, setEntradas] = useState([]);
   const [busca, setBusca] = useState("");
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [modalAberto, setModalAberto] = useState(false);
@@ -34,13 +56,16 @@ function Estoque({ usuarioLogado }) {
 
   const carregarProdutos = async () => {
     setCarregando(true);
-    setErroTela(""); // Limpa erro anterior antes de tentar de novo
+    setErroTela("");
+
     try {
-      // ✅ Bate em apenas uma rota!
-      const resp = await api.get("/entradas-estoque"); // ou a rota que você definiu no seu Go
-      const dados = resp?.data ?? resp; // Trata se o axios colocar dentro de "data"
-      
-      const estoquePronto = (Array.isArray(dados) ? dados : []).map(normalizarEntradaCompleta);
+      const resp = await api.get("/entradas-estoque");
+      const dados = resp?.data ?? resp;
+
+      const estoquePronto = (Array.isArray(dados) ? dados : []).map(
+        normalizarEntradaCompleta
+      );
+
       setEntradas(estoquePronto);
     } catch (erro) {
       console.error(erro);
@@ -54,8 +79,6 @@ function Estoque({ usuarioLogado }) {
     carregarProdutos();
   }, []);
 
-  // ✅ O useMemo gigante `estoqueNormalizado` FOI DELETADO.
-  // Agora a busca filtra diretamente o estado `entradas`
   const listaFiltrada = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
@@ -80,7 +103,6 @@ function Estoque({ usuarioLogado }) {
     );
   }, [listaFiltrada]);
 
-  // ✅ O resumo agora também calcula direto a partir do estado `entradas`
   const resumo = useMemo(() => {
     const totalLotes = entradas.length;
 
@@ -260,6 +282,7 @@ function Estoque({ usuarioLogado }) {
                   {itensVisiveis.length > 0 ? (
                     itensVisiveis.map((item) => {
                       const validadeStatus = calcularStatusValidade(item.validade);
+                      const alertaValidade = getAlertaValidade(validadeStatus);
 
                       return (
                         <tr
@@ -314,16 +337,23 @@ function Estoque({ usuarioLogado }) {
                           </td>
 
                           <td className="p-4 text-center">
-                            <div className="flex flex-col items-center gap-1">
+                            <div className="flex flex-col items-center gap-2">
                               <span className="text-gray-500 text-sm">
                                 {formatarValidade(item.validade)}
                               </span>
+
                               <span
                                 className={`px-2 py-1 rounded text-[10px] font-bold border ${getValidadeBadge(
                                   validadeStatus
                                 )}`}
                               >
                                 {getValidadeTexto(validadeStatus)}
+                              </span>
+
+                              <span
+                                className={`px-2 py-1 rounded text-[10px] font-bold border ${alertaValidade.classe}`}
+                              >
+                                {alertaValidade.icone} {alertaValidade.texto}
                               </span>
                             </div>
                           </td>
@@ -355,6 +385,7 @@ function Estoque({ usuarioLogado }) {
               {itensVisiveis.length > 0 ? (
                 itensVisiveis.map((item) => {
                   const validadeStatus = calcularStatusValidade(item.validade);
+                  const alertaValidade = getAlertaValidade(validadeStatus);
 
                   return (
                     <div
@@ -411,19 +442,27 @@ function Estoque({ usuarioLogado }) {
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <span
-                          className={`px-2 py-1 rounded text-[10px] font-bold border ${getValidadeBadge(
-                            validadeStatus
-                          )}`}
-                        >
-                          {getValidadeTexto(validadeStatus)}
-                        </span>
+                      <div className="mt-3 flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`px-2 py-1 rounded text-[10px] font-bold border ${getValidadeBadge(
+                              validadeStatus
+                            )}`}
+                          >
+                            {getValidadeTexto(validadeStatus)}
+                          </span>
+
+                          <span
+                            className={`px-2 py-1 rounded text-[10px] font-bold border ${alertaValidade.classe}`}
+                          >
+                            {alertaValidade.icone} {alertaValidade.texto}
+                          </span>
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => setItemDetalhe(item)}
-                          className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition"
+                          className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition w-full sm:w-auto"
                         >
                           Ver detalhes
                         </button>
