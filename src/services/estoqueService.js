@@ -1,49 +1,39 @@
 import { api } from "./api";
 
+// Mantemos essa função! Ela é um ótimo escudo.
+// Se o backend der erro ou mandar algo vazio, ela garante que o 
+// React receba uma lista vazia [], evitando que a tela quebre.
 function extrairLista(resp) {
   const dados = resp?.data ?? resp;
   return Array.isArray(dados) ? dados : [];
 }
 
-async function buscarPrimeiraLista(rotas) {
-  for (const rota of rotas) {
-    try {
-      const resp = await api.get(rota);
-      const lista = extrairLista(resp);
-
-      if (Array.isArray(lista)) {
-        return lista;
-      }
-    } catch {
-      // tenta a próxima rota
-    }
+// Criamos uma função simples e direta, sem aquele loop for...of
+async function buscarLista(rota, mensagemErro) {
+  try {
+    const resp = await api.get(rota);
+    return extrairLista(resp);
+  } catch (erro) {
+    console.error(`Erro ao buscar dados na rota ${rota}:`, erro);
+    throw new Error(mensagemErro);
   }
-
-  throw new Error("Não foi possível carregar os dados da rota informada.");
 }
 
 export async function listarTiposProtecao() {
-  return buscarPrimeiraLista([
-    "/tipo-protecao",
-    "/tipos-protecao",
-    "/tipos_protecao",
-  ]);
+  return buscarLista("/protecoes", "Não foi possível carregar os tipos de proteção.");
 }
 
 export async function listarTamanhos() {
-  return buscarPrimeiraLista(["/tamanhos", "/tamanho"]);
+  return buscarLista("/tamanhos", "Não foi possível carregar os tamanhos.");
 }
 
 export async function listarEpis() {
-  return buscarPrimeiraLista(["/epis", "/epi", "/produtos"]);
+  return buscarLista("/epis", "Não foi possível carregar o catálogo de EPIs.");
 }
 
+// Lembra da nossa conversa anterior? 
+// Agora essa rota "/entradas" é a que vai trazer aquele JSON "gordo" e aninhado,
+// com Tamanho e EPI (e Proteção) já embutidos dentro dela!
 export async function listarEntradasEstoque() {
-  return buscarPrimeiraLista([
-    "/entrada-epi",
-    "/entrada_epi",
-    "/entradas-epi",
-    "/entradas_epis",
-    "/entradas",
-  ]);
+  return buscarLista("/entradas", "Não foi possível carregar as entradas de estoque.");
 }

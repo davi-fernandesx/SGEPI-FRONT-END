@@ -2,28 +2,45 @@ import { api } from "./api";
 
 function extrairLista(resp) {
   const dados = resp?.data ?? resp;
-  return Array.isArray(dados) ? dados : [];
+
+  if (Array.isArray(dados)) return dados;
+
+  // Fiz o mapeamento EXATO baseado no seu log do console
+  const listaExtraida = 
+    dados?.entregas ??    // Entregas veio minúsculo
+    dados?.funcionario ?? // Funcionários veio como 'funcionario' (singular)
+    dados?.Epis ??        // Epis veio com E maiúsculo
+    dados?.tamanhos ??    // Tamanhos veio minúsculo
+    null;
+
+  return Array.isArray(listaExtraida) ? listaExtraida : [];
 }
 
 async function buscarPrimeiraLista(rotas) {
   for (const rota of rotas) {
     try {
       const resp = await api.get(rota);
+      
+      // LOG DE DEBUG: Vamos ver o que está chegando aqui
+      console.log(`Resposta da rota ${rota}:`, resp?.data ?? resp);
+
       const lista = extrairLista(resp);
 
-      if (Array.isArray(lista)) {
-        return lista;
-      }
-    } catch {
-      // tenta próxima rota
+      // Só retorna se a lista realmente tiver algo ou se for a última tentativa
+      if (lista.length > 0) return lista;
+      
+    } catch (erro) {
+      console.error(`Erro na rota ${rota}:`, erro);
+      continue;
     }
   }
-
-  throw new Error("Não foi possível carregar os dados.");
+  // Se percorreu tudo e voltou vazio, retorna array vazio em vez de erro 
+  // para a tela não travar, apenas mostrar "Nenhum registro"
+  return [];
 }
 
 export async function listarEntregas() {
-  return buscarPrimeiraLista(["/entrega-epi", "/entrega_epi", "/entregas"]);
+  return buscarPrimeiraLista(["/entregas"]);
 }
 
 export async function listarFuncionariosEntrega() {
@@ -31,15 +48,15 @@ export async function listarFuncionariosEntrega() {
 }
 
 export async function listarEpisEntrega() {
-  return buscarPrimeiraLista(["/epis", "/epi", "/produtos"]);
+  return buscarPrimeiraLista(["/epis"]);
 }
 
 export async function listarTamanhosEntrega() {
-  return buscarPrimeiraLista(["/tamanhos", "/tamanho"]);
+  return buscarPrimeiraLista(["/tamanhos"]);
 }
 
 export async function criarEntrega(payload) {
-  const rotas = ["/entrega-epi", "/entrega_epi", "/entregas"];
+  const rotas = ["/cadastro-entregas"];
   let ultimoErro = null;
 
   for (const rota of rotas) {
@@ -52,20 +69,4 @@ export async function criarEntrega(payload) {
   }
 
   throw ultimoErro || new Error("Não foi possível registrar a entrega.");
-}
-
-export async function salvarItensEntrega(lista) {
-  const rotas = ["/epis-entregues", "/epis_entregues"];
-  let ultimoErro = null;
-
-  for (const rota of rotas) {
-    try {
-      await Promise.all(lista.map((item) => api.post(rota, item)));
-      return true;
-    } catch (erro) {
-      ultimoErro = erro;
-    }
-  }
-
-  throw ultimoErro || new Error("Não foi possível salvar os itens da entrega.");
 }

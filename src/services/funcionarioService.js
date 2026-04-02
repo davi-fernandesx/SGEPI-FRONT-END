@@ -1,64 +1,50 @@
 import { api } from "./api";
 import {
   extrairLista,
-  normalizarDevolucao,
   normalizarDepartamento,
-  normalizarEntrega,
   normalizarFuncionario,
   normalizarFuncao,
 } from "../utils/funcionarios";
 
-async function buscarPrimeiraLista(rotas) {
-  let ultimoErro = null;
-
-  for (const rota of rotas) {
-    try {
-      console.log("Tentando rota:", rota);
-      const resposta = await api.get(rota);
-      const lista = extrairLista(resposta);
-      console.log("Sucesso na rota:", rota, lista);
-
-      if (Array.isArray(lista)) {
-        return lista;
-      }
-    } catch (erro) {
-      console.error("Erro na rota:", rota, erro);
-      ultimoErro = erro;
-    }
-  }
-
-  throw (
-    ultimoErro ||
-    new Error("Não foi possível buscar dados em nenhuma das rotas informadas.")
-  );
-}
-
 export async function carregarDadosFuncionarios() {
-  const [
-    listaFuncionarios,
-    listaDepartamentos,
-    listaFuncoes,
-    listaEntregas,
-    listaDevolucoes,
-  ] = await Promise.all([
-    buscarPrimeiraLista(["/funcionarios"]),
-    buscarPrimeiraLista(["/departamentos"]),
-    buscarPrimeiraLista(["/funcoes", "/funcao", "/cargos", "/cargo"]),
-    buscarPrimeiraLista([
-      "/entrega-epi",
-      "/entrega_epi",
-      "/entregas",
-      "/epis-entregues",
-      "/epis_entregues",
-    ]),
-    buscarPrimeiraLista(["/devolucoes", "/devolucao"]),
-  ]);
+  try {
+    // 1. Fazemos apenas UMA única chamada para o back-end!
+    const resposta = await api.get("/funcionario-estoque");
+    const listaFuncionarios = extrairLista(resposta);
 
-  return {
-    funcionarios: listaFuncionarios.map(normalizarFuncionario),
-    departamentos: listaDepartamentos.map(normalizarDepartamento),
-    funcoes: listaFuncoes.map(normalizarFuncao),
-    entregas: listaEntregas.map(normalizarEntrega),
-    devolucoes: listaDevolucoes.map(normalizarDevolucao),
-  };
+    // 2. Normalizamos os funcionários normalmente
+    const funcionariosNormalizados = listaFuncionarios.map(normalizarFuncionario);
+
+    // 3. EXTRAÇÃO INTELIGENTE:
+    // Varremos a lista de funcionários e guardamos os departamentos e funções 
+    // usando um Map (o Map garante que não teremos IDs repetidos na lista final)
+    const mapDepartamentos = new Map();
+    const mapFuncoes = new Map();
+
+    listaFuncionarios.forEach((item) => {
+      // Verifica se o funcionário tem função e departamento embutidos
+      if (item?.funcao?.departamento?.id) {
+        mapDepartamentos.set(item.funcao.departamento.id, item.funcao.departamento);
+      }
+      if (item?.funcao?.id) {
+        mapFuncoes.set(item.funcao.id, item.funcao);
+      }
+    });
+
+    return {
+      funcionarios: funcionariosNormalizados,
+      
+      // Transformamos os Maps de volta em listas (Arrays) e passamos pelo normalizador
+      departamentos: Array.from(mapDepartamentos.values()).map(normalizarDepartamento),
+      funcoes: Array.from(mapFuncoes.values()).map(normalizarFuncao),
+      
+      // Mantemos vazias para não quebrar a tela
+      entregas: [],
+      devolucoes: [],
+    };
+
+  } catch (erro) {
+    console.error("Erro na rota /funcionarios:", erro);
+    throw new Error("Falha ao carregar os dados da tela de funcionários.");
+  }
 }

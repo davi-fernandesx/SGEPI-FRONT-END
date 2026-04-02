@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "https://api.radaptech.com.br/api";
+const DEFAULT_BASE_URL = "https://homolog.radaptech.com.br/api";
 
 export const BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BASE_URL).replace(
   /\/+$/,

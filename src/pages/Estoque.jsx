@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ModalNovoEpi from "../components/modals/ModalNovoEpi";
 import ModalDetalhesEstoque from "../components/modals/ModalDetalhesEstoque";
-import {
-  listarEntradasEstoque,
-  listarEpis,
-  listarTamanhos,
-  listarTiposProtecao,
-} from "../services/estoqueService";
+import { api } from "../services/api"; // Lembre-se de importar sua api aqui, já que estamos chamando direto nela agora
 import { temPermissao } from "../utils/permissoes";
 import {
   calcularStatusValidade,
@@ -17,17 +12,10 @@ import {
   getValidadeBadge,
   getValidadeTexto,
 } from "../utils/estoqueHelpers";
-import {
-  normalizarEntrada,
-  normalizarEpi,
-  normalizarTamanho,
-  normalizarTipoProtecao,
-} from "../utils/estoqueNormalizers";
+import { normalizarEntradaCompleta } from "../utils/estoqueNormalizers";
 
 function Estoque({ usuarioLogado }) {
-  const [epis, setEpis] = useState([]);
-  const [tiposProtecao, setTiposProtecao] = useState([]);
-  const [tamanhos, setTamanhos] = useState([]);
+  // ✅ Apagamos epis, tiposProtecao e tamanhos! Só sobrou o que importa:
   const [entradas, setEntradas] = useState([]);
 
   const [busca, setBusca] = useState("");
@@ -46,30 +34,17 @@ function Estoque({ usuarioLogado }) {
 
   const carregarProdutos = async () => {
     setCarregando(true);
-    setErroTela("");
-
+    setErroTela(""); // Limpa erro anterior antes de tentar de novo
     try {
-      const [listaTipos, listaTamanhos, listaEpis, listaEntradas] =
-        await Promise.all([
-          listarTiposProtecao(),
-          listarTamanhos(),
-          listarEpis(),
-          listarEntradasEstoque(),
-        ]);
-
-      setTiposProtecao(listaTipos.map(normalizarTipoProtecao));
-      setTamanhos(listaTamanhos.map(normalizarTamanho));
-      setEpis(listaEpis.map(normalizarEpi));
-      setEntradas(listaEntradas.map(normalizarEntrada));
+      // ✅ Bate em apenas uma rota!
+      const resp = await api.get("/entradas-estoque"); // ou a rota que você definiu no seu Go
+      const dados = resp?.data ?? resp; // Trata se o axios colocar dentro de "data"
+      
+      const estoquePronto = (Array.isArray(dados) ? dados : []).map(normalizarEntradaCompleta);
+      setEntradas(estoquePronto);
     } catch (erro) {
-      console.error("Erro ao carregar estoque:", erro);
-      setErroTela(
-        erro?.message || "Não foi possível carregar os dados do estoque."
-      );
-      setTiposProtecao([]);
-      setTamanhos([]);
-      setEpis([]);
-      setEntradas([]);
+      console.error(erro);
+      setErroTela("Não foi possível carregar o estoque.");
     } finally {
       setCarregando(false);
     }
@@ -79,41 +54,14 @@ function Estoque({ usuarioLogado }) {
     carregarProdutos();
   }, []);
 
-  const estoqueNormalizado = useMemo(() => {
-    return entradas.map((entrada) => {
-      const epi = epis.find((item) => item.id === entrada.idEpi);
-      const tamanho = tamanhos.find((item) => item.id === entrada.idTamanho);
-      const tipo = tiposProtecao.find(
-        (item) => item.id === Number(epi?.idTipoProtecao ?? 0)
-      );
-
-      return {
-        id: entrada.id,
-        nome: epi?.nome ?? "EPI não encontrado",
-        fabricante: epi?.fabricante ?? "-",
-        ca: epi?.CA ?? "-",
-        descricao: epi?.descricao ?? "",
-        tipoProtecao: tipo?.nome ?? "-",
-        lote: entrada.lote || "-",
-        tamanho: tamanho?.tamanho || "-",
-        preco: entrada.valor_unitario || 0,
-        quantidadeInicial: entrada.quantidade || 0,
-        quantidadeAtual: entrada.quantidadeAtual || 0,
-        validade: entrada.data_validade || epi?.validade_CA || null,
-        alertaMinimo: Number(epi?.alerta_minimo ?? 0),
-        valorTotal:
-          Number(entrada.quantidadeAtual || 0) *
-          Number(entrada.valor_unitario || 0),
-      };
-    });
-  }, [entradas, epis, tamanhos, tiposProtecao]);
-
+  // ✅ O useMemo gigante `estoqueNormalizado` FOI DELETADO.
+  // Agora a busca filtra diretamente o estado `entradas`
   const listaFiltrada = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
-    if (!termo) return estoqueNormalizado;
+    if (!termo) return entradas;
 
-    return estoqueNormalizado.filter((item) => {
+    return entradas.filter((item) => {
       return (
         (item.nome || "").toLowerCase().includes(termo) ||
         (item.fabricante || "").toLowerCase().includes(termo) ||
@@ -124,7 +72,7 @@ function Estoque({ usuarioLogado }) {
         (item.descricao || "").toLowerCase().includes(termo)
       );
     });
-  }, [estoqueNormalizado, busca]);
+  }, [entradas, busca]);
 
   const listaOrdenada = useMemo(() => {
     return [...listaFiltrada].sort((a, b) =>
@@ -132,25 +80,26 @@ function Estoque({ usuarioLogado }) {
     );
   }, [listaFiltrada]);
 
+  // ✅ O resumo agora também calcula direto a partir do estado `entradas`
   const resumo = useMemo(() => {
-    const totalLotes = estoqueNormalizado.length;
+    const totalLotes = entradas.length;
 
-    const totalItens = estoqueNormalizado.reduce(
+    const totalItens = entradas.reduce(
       (acc, item) => acc + Number(item.quantidadeAtual || 0),
       0
     );
 
-    const estoqueBaixo = estoqueNormalizado.filter(
+    const estoqueBaixo = entradas.filter(
       (item) =>
         Number(item.quantidadeAtual || 0) > 0 &&
         Number(item.quantidadeAtual || 0) <= Number(item.alertaMinimo || 0)
     ).length;
 
-    const semEstoque = estoqueNormalizado.filter(
+    const semEstoque = entradas.filter(
       (item) => Number(item.quantidadeAtual || 0) <= 0
     ).length;
 
-    const valorTotal = estoqueNormalizado.reduce(
+    const valorTotal = entradas.reduce(
       (acc, item) => acc + Number(item.valorTotal || 0),
       0
     );
@@ -162,7 +111,7 @@ function Estoque({ usuarioLogado }) {
       semEstoque,
       valorTotal,
     };
-  }, [estoqueNormalizado]);
+  }, [entradas]);
 
   const totalPaginas = Math.max(
     1,
