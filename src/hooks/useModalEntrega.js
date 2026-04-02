@@ -4,7 +4,6 @@ import {
   listarEpisEntrega,
   listarFuncionariosEntrega,
   listarTamanhosEntrega,
-  salvarItensEntrega,
 } from "../services/entregaService";
 import {
   gerarTokenValidacaoEntrega,
@@ -205,33 +204,7 @@ export function useModalEntrega({ assinaturaPreview, onClose, onSalvar }) {
     };
 
     try {
-      let respostaEntrega;
-
-      try {
-        respostaEntrega = await criarEntrega(payloadEntregaBase);
-      } catch {
-        const payloadSomenteCabecalho = {
-          idFuncionario: Number(funcionario),
-          data_entrega: dataEntrega,
-          assinatura: assinaturaPreview,
-          token_validacao: tokenValidacao,
-        };
-
-        respostaEntrega = await criarEntrega(payloadSomenteCabecalho);
-
-        const idEntregaServidor = resolverIdEntrega(respostaEntrega);
-
-        if (idEntregaServidor > 0) {
-          const itensPayload = itensNormalizados.map((item) => ({
-            idEntrega: idEntregaServidor,
-            idEpi: item.idEpi,
-            idTamanho: item.idTamanho,
-            quantidade: item.quantidade,
-          }));
-
-          await salvarItensEntrega(itensPayload);
-        }
-      }
+      const respostaEntrega = await criarEntrega(payloadEntregaBase);
 
       const idEntregaFinal = resolverIdEntrega(respostaEntrega);
 

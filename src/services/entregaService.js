@@ -5,12 +5,11 @@ function extrairLista(resp) {
 
   if (Array.isArray(dados)) return dados;
 
-  // Fiz o mapeamento EXATO baseado no seu log do console
-  const listaExtraida = 
-    dados?.entregas ??    // Entregas veio minúsculo
-    dados?.funcionario ?? // Funcionários veio como 'funcionario' (singular)
-    dados?.Epis ??        // Epis veio com E maiúsculo
-    dados?.tamanhos ??    // Tamanhos veio minúsculo
+  const listaExtraida =
+    dados?.entregas ??
+    dados?.funcionario ??
+    dados?.Epis ??
+    dados?.tamanhos ??
     null;
 
   return Array.isArray(listaExtraida) ? listaExtraida : [];
@@ -20,22 +19,16 @@ async function buscarPrimeiraLista(rotas) {
   for (const rota of rotas) {
     try {
       const resp = await api.get(rota);
-      
-      // LOG DE DEBUG: Vamos ver o que está chegando aqui
       console.log(`Resposta da rota ${rota}:`, resp?.data ?? resp);
 
       const lista = extrairLista(resp);
 
-      // Só retorna se a lista realmente tiver algo ou se for a última tentativa
       if (lista.length > 0) return lista;
-      
     } catch (erro) {
       console.error(`Erro na rota ${rota}:`, erro);
-      continue;
     }
   }
-  // Se percorreu tudo e voltou vazio, retorna array vazio em vez de erro 
-  // para a tela não travar, apenas mostrar "Nenhum registro"
+
   return [];
 }
 
