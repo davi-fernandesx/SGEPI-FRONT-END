@@ -270,7 +270,7 @@ function Dashboard({ usuarioLogado }) {
   if (!podeVisualizarDashboard) {
     return (
       <div className="animate-fade-in">
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-amber-700">
             Você não tem permissão para visualizar o dashboard.
           </div>
@@ -280,124 +280,118 @@ function Dashboard({ usuarioLogado }) {
   }
 
   return (
-    <div className="animate-fade-in overflow-x-hidden pb-20 md:pb-0">
-      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
-            Olá, <span className="text-blue-600">{nomeExibicao}</span> 👋
-          </h2>
-          <p className="text-sm md:text-base text-gray-500 mt-1">
-            Aqui está o resumo geral do sistema hoje.
-          </p>
-        </div>
-
-        <div className="hidden md:block text-right">
-          <p className="text-xs font-bold text-gray-400 uppercase">
-            Status do Sistema
-          </p>
-          <div className="flex items-center gap-2 justify-end">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-sm font-semibold text-gray-700">
-              {carregandoResumo ? "Carregando..." : "Operacional"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-8 ml-2 md:ml-1 flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4">
-        <div>
-          <h3 className="text-lg md:text-xl font-bold text-gray-800">
-            Visão principal do dashboard
-          </h3>
-          <p className="text-sm text-gray-500">
-            Clique em qualquer card para abrir os detalhes correspondentes.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5 mb-8 md:mb-10">
-        {cardsPrincipais.map((card) => (
-          <DashboardCard
-            key={card.id}
-            card={card}
-            onClick={() => setDetalheCardAberto(card.id)}
-          />
-        ))}
-      </div>
-
-      <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100 mb-8">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          📌 Resumo rápido
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-gray-500">EPIs cadastrados</p>
-            <p className="text-lg font-bold text-gray-800">
-              {carregandoResumo ? "--" : epis.length}
+    <div className="animate-fade-in overflow-x-hidden xl:h-[calc(100vh-110px)] xl:overflow-hidden">
+      <div className="grid h-full grid-rows-[auto_auto_1fr] gap-3">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_0.8fr] gap-3">
+          <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-2xl md:text-[2rem] leading-tight font-bold text-gray-800 tracking-tight">
+              Olá, <span className="text-blue-600">{nomeExibicao}</span> 👋
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Aqui está o resumo geral do sistema hoje.
             </p>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-gray-500">Entradas registradas</p>
-            <p className="text-lg font-bold text-gray-800">
-              {carregandoResumo ? "--" : entradas.length}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between xl:justify-center xl:flex-col xl:items-start">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+              Status do Sistema
             </p>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-gray-500">Devoluções hoje</p>
-            <p className="text-lg font-bold text-gray-800">
-              {carregandoResumo ? "--" : resumo.devolucoesHoje}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-sm font-semibold text-gray-700">
+                {carregandoResumo ? "Carregando..." : "Operacional"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-        ⚡ Ações Rápidas
-      </h3>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          {cardsPrincipais.map((card) => (
+            <DashboardCard
+              key={card.id}
+              card={card}
+              onClick={() => setDetalheCardAberto(card.id)}
+            />
+          ))}
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <QuickActionCard
-          titulo="Registrar Entrada"
-          descricao="Repor estoque / Compras"
-          icone="➕"
-          onClick={() => setModalAberto("entrada")}
-          className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
-          descricaoClassName="text-emerald-100 group-hover:text-white"
-          iconBoxClassName="bg-white/10 group-hover:bg-white/20"
-        />
+        <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-3 min-h-0">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 min-h-0">
+            <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+              📌 Resumo rápido
+            </h3>
 
-        <QuickActionCard
-          titulo="Realizar Entrega"
-          descricao="Entregar EPI ao funcionário"
-          icone="👷"
-          onClick={() => setModalAberto("entrega")}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
-          descricaoClassName="text-blue-100 group-hover:text-white"
-          iconBoxClassName="bg-white/10 group-hover:bg-white/20"
-        />
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
+                <p className="text-gray-500 text-sm">EPIs cadastrados</p>
+                <p className="text-lg font-bold text-gray-800 leading-tight">
+                  {carregandoResumo ? "--" : epis.length}
+                </p>
+              </div>
 
-        <QuickActionCard
-          titulo="Devolução / Baixa"
-          descricao="Registrar devolução, dano ou descarte"
-          icone="📉"
-          onClick={() => setModalAberto("baixa")}
-          className="bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
-          descricaoClassName="text-rose-100 group-hover:text-white"
-          iconBoxClassName="bg-white/10 group-hover:bg-white/20"
-        />
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
+                <p className="text-gray-500 text-sm">Entradas registradas</p>
+                <p className="text-lg font-bold text-gray-800 leading-tight">
+                  {carregandoResumo ? "--" : entradas.length}
+                </p>
+              </div>
 
-        <QuickActionCard
-          titulo="Consultar Estoque Rápido"
-          descricao="Pesquisar por CA, nome, fabricante ou lote"
-          icone="🔍"
-          onClick={() => setModalAberto("busca")}
-          fullWidth
-          className="bg-white border-2 border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
-          descricaoClassName="text-gray-400 group-hover:text-blue-400"
-        />
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
+                <p className="text-gray-500 text-sm">Devoluções hoje</p>
+                <p className="text-lg font-bold text-gray-800 leading-tight">
+                  {carregandoResumo ? "--" : resumo.devolucoesHoje}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 min-h-0">
+            <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+              ⚡ Ações Rápidas
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <QuickActionCard
+                titulo="Registrar Entrada"
+                descricao="Repor estoque / Compras"
+                icone="➕"
+                onClick={() => setModalAberto("entrada")}
+                className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
+                descricaoClassName="text-emerald-100 group-hover:text-white"
+                iconBoxClassName="bg-white/10 group-hover:bg-white/20"
+              />
+
+              <QuickActionCard
+                titulo="Realizar Entrega"
+                descricao="Entregar EPI ao funcionário"
+                icone="👷"
+                onClick={() => setModalAberto("entrega")}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
+                descricaoClassName="text-blue-100 group-hover:text-white"
+                iconBoxClassName="bg-white/10 group-hover:bg-white/20"
+              />
+
+              <QuickActionCard
+                titulo="Devolução / Baixa"
+                descricao="Registrar devolução, dano ou descarte"
+                icone="📉"
+                onClick={() => setModalAberto("baixa")}
+                className="bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-1"
+                descricaoClassName="text-rose-100 group-hover:text-white"
+                iconBoxClassName="bg-white/10 group-hover:bg-white/20"
+              />
+
+              <QuickActionCard
+                titulo="Consultar Estoque Rápido"
+                descricao="Pesquisar por CA, nome, fabricante ou lote"
+                icone="🔍"
+                onClick={() => setModalAberto("busca")}
+                className="bg-white border-2 border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                descricaoClassName="text-gray-400 group-hover:text-blue-400"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <ModalDetalhesDashboard
