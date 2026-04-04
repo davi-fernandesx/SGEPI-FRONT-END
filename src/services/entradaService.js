@@ -56,7 +56,7 @@ export async function listarEntradas() {
 }
 
 export async function criarEntrada(payload) {
-  const rotas = ["/cadastrar-entrada"];
+  const rotas = ["/gerencial/cadastrar-entrada"];
 
   for (const rota of rotas) {
     try {

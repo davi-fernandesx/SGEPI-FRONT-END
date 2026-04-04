@@ -10,12 +10,14 @@ export function normalizarFornecedorEntrada(item) {
 export function normalizarEpiEntrada(item) {
   return {
     id: Number(item?.id ?? item?.ID ?? 0),
-    nome: item?.nome || item?.Nome || "",
-    fabricante: item?.fabricante || "",
-    CA: item?.CA || item?.ca || "",
-    
+    nome: item?.nome || "",
+    CA: item?.CA || "",
+    // Adicione esta linha para capturar os tamanhos permitidos
+    tamanhos: item?.tamanhos || [] 
   };
 }
+
+
 
 export function normalizarTamanhoEntrada(item) {
   return {

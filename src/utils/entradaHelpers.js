@@ -20,3 +20,17 @@ export function formatarMoedaEntrada(valor) {
     currency: "BRL",
   });
 }
+
+export function formatarDataParaGo(dataISO) {
+  // Se a data for vazia, null ou undefined, retorna string vazia ou null
+  // para o Go não reclamar de formato "undefined/undefined/..."
+  if (!dataISO || dataISO === "" || typeof dataISO !== "string") {
+    return null; 
+  }
+
+  // Verifica se a data realmente está no formato YYYY-MM-DD
+  if (!dataISO.includes("-")) return dataISO;
+
+  const [ano, mes, dia] = dataISO.split("-");
+  return `${dia}/${mes}/${ano}`;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import ModalNovaEntrada from "../components/modals/ModalNovaEntrada";
+
+import ModalEntrada from "../components/modals/ModalEntrada";
 import formatarData from "../utils/DatasFormater.js";
 import {
   listarEntradas,
@@ -456,7 +457,7 @@ const entradasResolvidas = useMemo(() => {
       </div>
 
       {modalAberto && (
-        <ModalNovaEntrada
+        <ModalEntrada
           aberto={modalAberto}
           fornecedores={fornecedores}
           epis={epis}
