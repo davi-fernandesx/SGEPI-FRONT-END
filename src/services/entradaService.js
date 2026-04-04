@@ -1,8 +1,25 @@
 import { api } from "./api";
 
-function extrairLista(resp) {
+export function extrairLista(resp) {
+  // Pega o corpo da resposta
   const dados = resp?.data ?? resp;
-  return Array.isArray(dados) ? dados : [];
+
+  // 1. Se o Back-end mandou um Array direto (ex: Tamanhos), retorna ele
+  if (Array.isArray(dados)) return dados;
+
+  // 2. Se for um Objeto (Paginado), busca a lista dentro das chaves possíveis
+  // O Go costuma usar PascalCase (Fornecedores), o JS costuma usar camelCase (fornecedores)
+  const listaEncontrada = 
+    dados?.Fornecedores || dados?.fornecedores || 
+    dados?.Epis || dados?.epis || 
+    dados?.Entradas || dados?.entradas || 
+    dados?.Tamanhos || dados?.tamanhos ||
+    dados?.Data || dados?.data || 
+    [];
+
+  console.log("📥 [Service] Conteúdo extraído:", listaEncontrada);
+  
+  return Array.isArray(listaEncontrada) ? listaEncontrada : [];
 }
 
 async function buscarPrimeiraLista(rotas) {
@@ -25,23 +42,21 @@ export async function listarFornecedores() {
 }
 
 export async function listarEpis() {
-  return buscarPrimeiraLista(["/epis", "/epi", "/produtos"]);
+  return buscarPrimeiraLista(["/epis"]);
 }
 
 export async function listarTamanhos() {
-  return buscarPrimeiraLista(["/tamanhos", "/tamanho"]);
+  return buscarPrimeiraLista(["/tamanhos"]);
 }
 
 export async function listarEntradas() {
   return buscarPrimeiraLista([
-    "/entrada-epi",
-    "/entrada_epi",
     "/entradas",
   ]);
 }
 
 export async function criarEntrada(payload) {
-  const rotas = ["/entrada-epi", "/entrada_epi", "/entradas"];
+  const rotas = ["/cadastrar-entrada"];
 
   for (const rota of rotas) {
     try {

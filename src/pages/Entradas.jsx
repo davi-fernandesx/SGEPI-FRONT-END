@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import ModalNovaEntrada from "../components/modals/ModalNovaEntrada";
+import formatarData from "../utils/DatasFormater.js";
 import {
   listarEntradas,
   listarEpis,
   listarFornecedores,
   listarTamanhos,
+  extrairLista,
 } from "../services/entradaService";
 import { temPermissao } from "../utils/permissoes";
 import {
-  formatarDataEntrada,
+
   formatarMoedaEntrada,
 } from "../utils/entradaHelpers";
 import {
@@ -42,70 +44,66 @@ function Entradas({ usuarioLogado }) {
     ? true
     : perfilUsuario === "admin" || perfilUsuario === "gerente";
 
-  const carregarEntradas = async () => {
+const carregarEntradas = async () => {
     setCarregandoTela(true);
     setErroTela("");
 
     try {
-      const [listaFornecedores, listaEpis, listaTamanhos, listaEntradas] =
-        await Promise.all([
+      const [resFornecedores, resEpis, resTamanhos, resEntradas] = await Promise.all([
           listarFornecedores(),
           listarEpis(),
           listarTamanhos(),
           listarEntradas(),
-        ]);
+      ]);
 
-      setFornecedores(listaFornecedores.map(normalizarFornecedorEntrada));
-      setEpis(listaEpis.map(normalizarEpiEntrada));
-      setTamanhos(listaTamanhos.map(normalizarTamanhoEntrada));
-      setEntradas(listaEntradas.map(normalizarEntrada));
+      // Extrai os arrays usando a função extrairLista
+      const listaF = extrairLista(resFornecedores);
+      const listaE = extrairLista(resEpis);
+      const listaT = extrairLista(resTamanhos);
+      const listaEnt = extrairLista(resEntradas);
+
+      // Seta os estados normalizando os dados
+      setFornecedores(listaF.map(normalizarFornecedorEntrada));
+      setEpis(listaE.map(normalizarEpiEntrada));
+      setTamanhos(listaT.map(normalizarTamanhoEntrada));
+      setEntradas(listaEnt.map(normalizarEntrada));
+      
+     
     } catch (erro) {
-      console.error("Erro ao carregar entradas:", erro);
-      setErroTela(
-        erro?.message || "Não foi possível carregar os registros de entrada."
-      );
-      setFornecedores([]);
-      setEpis([]);
-      setTamanhos([]);
-      setEntradas([]);
+      // ... seu bloco de catch atual ...
     } finally {
       setCarregandoTela(false);
     }
-  };
+};
 
   useEffect(() => {
     carregarEntradas();
   }, []);
 
-  const entradasResolvidas = useMemo(() => {
+const entradasResolvidas = useMemo(() => {
+    
+
     return entradas.map((entrada) => {
       const epi = epis.find((item) => Number(item.id) === Number(entrada.idEpi));
-      const tamanho = tamanhos.find(
-        (item) => Number(item.id) === Number(entrada.idTamanho)
-      );
-      const fornecedor = fornecedores.find(
-        (item) => Number(item.id) === Number(entrada.idFornecedor)
-      );
+      const tamanho = tamanhos.find((item) => Number(item.id) === Number(entrada.idTamanho));
+      const fornecedor = fornecedores.find((item) => Number(item.id) === Number(entrada.idFornecedor));
 
       return {
         ...entrada,
-        epiNome: epi?.nome || "Desconhecido",
+        epiNome: epi?.nome || "EPI não identificado",
         epiFabricante: epi?.fabricante || "-",
         epiCA: epi?.CA || "-",
-        tamanhoNome: tamanho?.tamanho || "-",
-        fornecedorNome:
-          fornecedor?.nome_fantasia ||
-          fornecedor?.razao_social ||
-          "Fornecedor não identificado",
+        tamanhoNome: tamanho?.tamanho || "S/T", // Se aparecer S/T, o find falhou
+        fornecedorNome: fornecedor?.nome_fantasia || fornecedor?.razao_social || "Fornecedor não identificado",
       };
     });
   }, [entradas, epis, tamanhos, fornecedores]);
 
   const entradasFiltradas = useMemo(() => {
     const termo = busca.toLowerCase().trim();
-
     if (!termo) return entradasResolvidas;
 
+   
     return entradasResolvidas.filter((entrada) => {
       return (
         (entrada.epiNome || "").toLowerCase().includes(termo) ||
@@ -129,7 +127,7 @@ function Entradas({ usuarioLogado }) {
   }, [entradasFiltradas]);
 
   const resumoTela = useMemo(() => {
-    return {
+    const resumo = {
       totalRegistros: entradasOrdenadas.length,
       totalItens: entradasOrdenadas.reduce(
         (acc, item) => acc + Number(item.quantidade || 0),
@@ -141,6 +139,7 @@ function Entradas({ usuarioLogado }) {
         0
       ),
     };
+    return resumo;
   }, [entradasOrdenadas]);
 
   useEffect(() => {
@@ -291,7 +290,7 @@ function Entradas({ usuarioLogado }) {
                           className="hover:bg-gray-50 transition"
                         >
                           <td className="p-4 text-gray-600 font-mono text-sm">
-                            {formatarDataEntrada(entrada.data_entrada)}
+                            {formatarData(entrada.data_entrada)}
                           </td>
 
                           <td className="p-4">
@@ -357,7 +356,7 @@ function Entradas({ usuarioLogado }) {
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                          {formatarDataEntrada(entrada.data_entrada)}
+                          {formatarData(entrada.data_entrada)}
                         </span>
 
                         <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200">
