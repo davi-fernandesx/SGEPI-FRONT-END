@@ -126,7 +126,7 @@ function ModalEntrada({ onClose, onSalvar, usuarioLogado }) {
     try {
       // MONTANDO O DTO MESTRE (Conforme sua struct EntradaEpiInserir)
       const payload = {
-        fornecedor: fornecedorSelecionado.nome_fantasia || fornecedorSelecionado.razao_social,
+        idfornecedor: Number(fornecedorId),
         nota_fiscal_numero: String(notaFiscalNumero).trim(),
         nota_fiscal_serie: String(notaFiscalSerie || "1").trim(),
         data_emissao: formatarDataParaGo(dataEntrada),

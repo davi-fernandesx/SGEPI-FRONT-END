@@ -18,7 +18,7 @@ export function normalizarEpi(item) {
   return {
     id: Number(item?.id ?? 0),
     nome: String(item?.nome ?? ""),
-    alerta_minimo: Number(item?.alertaMinimo ?? 0),
+    alerta_minimo: Number(item?.alerta_minimo ?? 0),
   };
 }
 

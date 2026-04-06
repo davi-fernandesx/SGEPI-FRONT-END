@@ -13,6 +13,7 @@ RUN npm install
 # 5. Copia todo o resto do seu código para dentro do container
 COPY . .
 
+ENV REACT_APP_API_URL=http://localhost:80/api
 # 6. Expõe a porta 3000 (onde o React roda)
 EXPOSE 3000
 

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-
 import ModalEntrada from "../components/modals/ModalEntrada";
 import formatarData from "../utils/DatasFormater.js";
 import {
@@ -10,10 +9,8 @@ import {
   extrairLista,
 } from "../services/entradaService";
 import { temPermissao } from "../utils/permissoes";
-import {
-
-  formatarMoedaEntrada,
-} from "../utils/entradaHelpers";
+import { formatarMoedaEntrada } from "../utils/entradaHelpers";
+// Importando seus normalizadores
 import {
   normalizarEntrada,
   normalizarEpiEntrada,
@@ -29,76 +26,71 @@ function Entradas({ usuarioLogado }) {
 
   const [carregandoTela, setCarregandoTela] = useState(true);
   const [erroTela, setErroTela] = useState("");
-
   const [modalAberto, setModalAberto] = useState(false);
   const [busca, setBusca] = useState("");
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const itensPorPagina = 5;
 
-  const podeVisualizar = !usuarioLogado
-    ? true
-    : temPermissao(usuarioLogado, "visualizar_estoque");
-
+  const podeVisualizar = !usuarioLogado ? true : temPermissao(usuarioLogado, "visualizar_estoque");
   const perfilUsuario = usuarioLogado?.perfil || usuarioLogado?.role || "";
-  const podeCadastrar = !usuarioLogado
-    ? true
-    : perfilUsuario === "admin" || perfilUsuario === "gerente";
+  const podeCadastrar = !usuarioLogado ? true : perfilUsuario === "admin" || perfilUsuario === "gerente";
 
-const carregarEntradas = async () => {
+  const carregarEntradas = async () => {
     setCarregandoTela(true);
     setErroTela("");
 
     try {
       const [resFornecedores, resEpis, resTamanhos, resEntradas] = await Promise.all([
-          listarFornecedores(),
-          listarEpis(),
-          listarTamanhos(),
-          listarEntradas(),
+        listarFornecedores(),
+        listarEpis(),
+        listarTamanhos(),
+        listarEntradas(),
       ]);
 
-      // Extrai os arrays usando a função extrairLista
-      const listaF = extrairLista(resFornecedores);
-      const listaE = extrairLista(resEpis);
-      const listaT = extrairLista(resTamanhos);
-      const listaEnt = extrairLista(resEntradas);
+      // Aplicação do Normalize que você enviou
+      setFornecedores(extrairLista(resFornecedores).map(normalizarFornecedorEntrada));
+      setEpis(extrairLista(resEpis).map(normalizarEpiEntrada));
+      setTamanhos(extrairLista(resTamanhos).map(normalizarTamanhoEntrada));
+      setEntradas(extrairLista(resEntradas).map(normalizarEntrada));
 
-      // Seta os estados normalizando os dados
-      setFornecedores(listaF.map(normalizarFornecedorEntrada));
-      setEpis(listaE.map(normalizarEpiEntrada));
-      setTamanhos(listaT.map(normalizarTamanhoEntrada));
-      setEntradas(listaEnt.map(normalizarEntrada));
-      
-     
     } catch (erro) {
-      // ... seu bloco de catch atual ...
+      setErroTela("Falha ao carregar dados do servidor.");
+      console.error(erro);
     } finally {
       setCarregandoTela(false);
     }
-};
+  };
 
   useEffect(() => {
     carregarEntradas();
   }, []);
 
-const entradasResolvidas = useMemo(() => {
-    
-
+  const entradasResolvidas = useMemo(() => {
     return entradas.map((entrada) => {
-      const epi = epis.find((item) => Number(item.id) === Number(entrada.idEpi));
-      const tamanho = tamanhos.find((item) => Number(item.id) === Number(entrada.idTamanho));
-      const fornecedor = fornecedores.find((item) => Number(item.id) === Number(entrada.idFornecedor));
+      // Prioriza buscar pelo ID agora que está normalizado, senão cai no nome
+
+      const epi = epis.find(item => item.id === entrada.IdEpi) || { nome: entrada.epi_nome_back };
+      const tamanhoObj = tamanhos.find(t => t.id === entrada.IdTamanho) || { tamanho: entrada.tamanho_nome_back };
+
+      const fornecedor = fornecedores.find(f => 
+        (entrada.Idfornecedor > 0 && f.id === entrada.Idfornecedor) ||
+        f.razao_social.toLowerCase() === entrada.fornecedor_nome_back.toLowerCase() ||
+        f.nome_fantasia.toLowerCase() === entrada.fornecedor_nome_back.toLowerCase()
+      );
+
+
 
       return {
         ...entrada,
-        epiNome: epi?.nome || "EPI não identificado",
+        epiNome: epi?.nome || entrada.epi_nome_back || "EPI não identificado",
         epiFabricante: epi?.fabricante || "-",
-        epiCA: epi?.CA || "-",
-        tamanhoNome: tamanho?.tamanho || "S/T", // Se aparecer S/T, o find falhou
-        fornecedorNome: fornecedor?.nome_fantasia || fornecedor?.razao_social || "Fornecedor não identificado",
+        epiCA: entrada.epi_ca_back || epi?.ca || "-", 
+        tamanhoNome: tamanhoObj?.tamanho || entrada.tamanho_nome_back || "S/T",
+        fornecedorNome: fornecedor?.nome_fantasia || fornecedor?.razao_social || entrada.fornecedor_nome_back || "Fornecedor não identificado",
       };
     });
-  }, [entradas, epis, tamanhos, fornecedores]);
+  }, [entradas, epis, tamanhos, fornecedores])
 
   const entradasFiltradas = useMemo(() => {
     const termo = busca.toLowerCase().trim();

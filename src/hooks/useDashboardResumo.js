@@ -46,22 +46,26 @@ export function useDashboardResumo() {
 
     try {
       const [
-        listaEpis,
-        listaTamanhos,
-        listaFuncionarios,
-        listaEntradas,
-        listaEntregas,
-        listaItensEntregues,
-        listaDevolucoes, // <-- Descomentado
-      ] = await Promise.all([
-        buscarPrimeiraLista(["/epis-dashbord"]),
-        buscarPrimeiraLista(["/tamanhos"]),
-        buscarPrimeiraLista(["/funcionarios-dashbord"]),
-        buscarPrimeiraLista(["/entradas-dashbord"]),
-        buscarPrimeiraLista(["/entregas-dashbord"]), 
-        buscarPrimeiraLista(["/entrega-itens-dashbord"]),
-        buscarPrimeiraLista(["/devolucoes"]), // <-- Descomentado e adicionado à API
-      ]);
+  listaEpis,
+  listaTamanhos,
+  listaFuncionarios,
+  listaEntradas,
+  listaEntregas,
+  listaItensEntregues,
+  listaDevolucoes,
+] = await Promise.all([
+  api.get("/epis-dashbord").catch(() => []),
+  api.get("/tamanhos").catch(() => []),
+  api.get("/funcionarios-dashbord").catch(() => []),
+  api.get("/entradas-dashbord").catch(() => []),
+  api.get("/entregas-dashbord").catch(() => []),
+  api.get("/entrega-itens-dashbord").catch(() => []),
+  api.get("/devolucoes").catch(() => {
+    console.warn("Rota /devolucoes ainda não implementada no Back-end");
+    return []; // Retorna lista vazia e o código continua rodando
+  }),
+]);
+    
 
       // ======== LOGS ATUALIZADOS ========
       console.log("📦 DADOS BRUTOS DA API:");

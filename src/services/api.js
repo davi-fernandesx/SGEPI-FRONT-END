@@ -1,5 +1,6 @@
 const DEFAULT_BASE_URL = "https://homolog.radaptech.com.br/api";
 
+console.log("Variável do ENV:", process.env.REACT_APP_API_URL);
 export const BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BASE_URL).replace(
   /\/+$/,
   ""
@@ -18,7 +19,7 @@ function getTenantId() {
 
   // Se você estiver testando na sua máquina (localhost)
   if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "teste"; // Força o tenant para você conseguir testar o login
+    return "frigopaiva"; // Força o tenant para você conseguir testar o login
   }
 
   // Se o front já estiver publicado (ex: frigopaiva.radaptech.com.br)

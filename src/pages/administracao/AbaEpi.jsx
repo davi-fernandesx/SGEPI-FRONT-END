@@ -25,7 +25,7 @@ export default function AbaEpis() {
       const dadosNormalizados = listaBruta.map(epi => ({
         ...epi,
         ca: epi.CA || epi.ca || "N/A",
-        data_validadeCa: epi.ValidadeCa || epi.validade_CA || epi.data_validadeCa || "---"
+        data_validadeCa: epi.validade_ca||  "---"
       }));
 
       setEpis(dadosNormalizados);
