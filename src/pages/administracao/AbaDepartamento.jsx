@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 // Ajuste o caminho da importação da api dependendo da sua estrutura de pastas
 import { api } from "../../services/api"; 
 
@@ -8,11 +8,15 @@ export default function AbaDepartamentos() {
   const [carregando, setCarregando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
+  // --- NOVOS ESTADOS PARA PAGINAÇÃO ---
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 7;
+
   useEffect(() => {
     carregarDepartamentos();
   }, []);
 
-const carregarDepartamentos = async () => {
+  const carregarDepartamentos = async () => {
     try {
       const resposta = await api.get("/departamentos");
       
@@ -25,6 +29,14 @@ const carregarDepartamentos = async () => {
     }
   };
 
+  // --- LÓGICA DE PAGINAÇÃO ---
+  const totalPaginas = Math.ceil(departamentos.length / itensPorPagina);
+
+  const departamentosPaginados = useMemo(() => {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    return departamentos.slice(inicio, fim);
+  }, [departamentos, paginaAtual]);
 
   // Substitua a função adicionarDepartamento por esta:
   const salvarDepartamento = async () => {
@@ -73,7 +85,7 @@ const carregarDepartamentos = async () => {
     }
   };
 
-return (
+  return (
     <div className="animate-fade-in">
       <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 flex flex-col md:flex-row gap-3 items-end">
         <div className="flex-1 w-full">
@@ -125,7 +137,7 @@ return (
             Nenhum departamento cadastrado.
           </div>
         ) : (
-          departamentos.map((d) => (
+          departamentosPaginados.map((d) => (
             <div
               key={d.id}
               className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm hover:shadow-md transition"
@@ -155,6 +167,31 @@ return (
           ))
         )}
       </div>
+
+      {/* --- CONTROLES DE PAGINAÇÃO --- */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+            disabled={paginaAtual === 1}
+            className="px-3 py-1 rounded border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            ← Anterior
+          </button>
+          
+          <span className="text-xs font-bold text-slate-500">
+            Página {paginaAtual} de {totalPaginas}
+          </span>
+
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+            disabled={paginaAtual === totalPaginas}
+            className="px-3 py-1 rounded border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

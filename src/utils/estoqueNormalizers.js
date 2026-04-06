@@ -14,7 +14,7 @@ export function normalizarEntradaCompleta(item) {
     fabricante: item?.epi?.fabricante ?? "-",
     ca: item?.epi?.ca ?? "-",
     descricao: item?.epi?.descricao ?? "",
-    alertaMinimo: item?.epi?.alerta_minimo ?? 0,
+    alertaMinimo: item?.epi?.alertaMinimo ?? "-",
     tipoProtecao: item?.epi?.protecao?.nome ?? "-",
     
     // Calculado no front

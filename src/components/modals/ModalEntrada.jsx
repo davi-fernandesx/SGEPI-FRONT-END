@@ -114,52 +114,57 @@ function ModalEntrada({ onClose, onSalvar, usuarioLogado }) {
     setLoteTemp(""); setDataFabricacaoTemp(""); setValidadeTemp("");
   }
 
-  async function salvarEntradaFinal() {
-    if (!fornecedorSelecionado || itensEntrada.length === 0) {
-      alert("Selecione um fornecedor e adicione ao menos um item.");
+ async function salvarEntradaFinal() {
+    // Validações básicas
+    if (!fornecedorId || !notaFiscalNumero || !dataEntrada || itensEntrada.length === 0) {
+      alert("Preencha os dados da nota e adicione pelo menos um item.");
       return;
     }
 
     setCarregando(true);
 
     try {
-      const registros = itensEntrada.map((item) => ({
-        // NOMES DE CHAVES CONFORME TAGS JSON DA STRUCT GO
-        id_epi: Number(item.idEpi),
-        id_tamanho: Number(item.idTamanho),
-        id_user: Number(usuarioLogado?.id || 1), 
-        id_fornecedor: Number(fornecedorSelecionado.id),
+      // MONTANDO O DTO MESTRE (Conforme sua struct EntradaEpiInserir)
+      const payload = {
+        fornecedor: fornecedorSelecionado.nome_fantasia || fornecedorSelecionado.razao_social,
+        nota_fiscal_numero: String(notaFiscalNumero).trim(),
+        nota_fiscal_serie: String(notaFiscalSerie || "1").trim(),
+        data_emissao: formatarDataParaGo(dataEntrada),
+        idUser: Number(usuarioLogado?.id || 1),
         
-        data_entrada: formatarDataParaGo(dataEntrada),
-        data_fabricacao: formatarDataParaGo(item.data_fabricacao),
-        data_validade: formatarDataParaGo(item.data_validade),
+        // MAPEANDO A LISTA DE ITENS (Conforme sua struct EntradaEpiItemInserir)
+        itens: itensEntrada.map((item) => ({
+          id_epi: Number(item.idEpi),
+          id_tamanho: Number(item.idTamanho),
+          quantidade: Number(item.quantidade),
+          data_fabricacao: formatarDataParaGo(item.data_fabricacao),
+          data_validade: formatarDataParaGo(item.data_validade),
+          lote: String(item.lote),
+          valor_unitario: String(item.valor_unitario), // Enviando como string para o Decimal do Go
+        })),
+      };
 
-        quantidade: Number(item.quantidade),
-        quantidade_Atual: Number(item.quantidade), 
-        
-        // Lote como string, mas apenas números conforme seu binding:numeric
-        lote: String(item.lote),
-        
-        notaFiscalNumero: String(notaFiscalNumero).replace(/\D/g, "").substring(0, 10),
-        notaFiscalSerie: String(notaFiscalSerie).replace(/\D/g, "").substring(0, 20),
-        
-        valorUnitario: Number(item.valor_unitario),
-      }));
+      console.log("🚀 Enviando Payload para o Go:", payload);
 
-      // Envia os registros para o backend
-      await Promise.all(registros.map(reg => criarEntrada(reg)));
+      // Chamada única para o backend
+      await criarEntrada(payload);
 
+      alert("📦 Entrada e estoque atualizados com sucesso!");
+      
       if (onSalvar) onSalvar();
-      alert("Estoque atualizado com sucesso!");
       onClose();
+      
     } catch (erro) {
-      console.error(erro);
-      alert(erro.response?.data?.detalhes || "Erro ao registrar entrada. Verifique os dados.");
+      console.error("❌ Erro ao salvar entrada:", erro);
+      
+      // Captura a mensagem de erro detalhada do validador do Go
+      const detalhesErro = erro.response?.data?.detalhes || erro.response?.data?.error;
+      alert(detalhesErro ? `Erro de validação: ${detalhesErro}` : "Erro interno no servidor ao processar entrada.");
+      
     } finally {
       setCarregando(false);
     }
   }
-
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh] border border-slate-200">

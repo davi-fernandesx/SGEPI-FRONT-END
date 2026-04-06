@@ -120,42 +120,40 @@ export function useDashboardResumo() {
     }, {});
   }, [itensEntregues]);
 
-  const estoqueDetalhado = useMemo(() => {
+const estoqueDetalhado = useMemo(() => {
     const mapa = {};
-
+console.log("📥 Dados brutos recebidos das 'entradas':", entradas);
     entradas.forEach((entrada) => {
-      const epi = episMap[Number(entrada.idEpi)];
-      const tamanho = tamanhosMap[Number(entrada.idTamanho)];
+      // 1. Ajuste para bater com o JSON: IdEpi, IdTamanho, QuantidadeAtual
+      const idEpiReal = entrada.idEpi; 
+      const idTamanhoReal = entrada.idTamanho;
+      const qtdAtualReal = Number(entrada.quantidadeAtual || 0);
 
-      const nomeItem =
-        entrada.epiNome || epi?.nome || `EPI #${entrada.idEpi || "--"}`;
-      const tamanhoLabel =
-        entrada.tamanhoTexto || tamanho?.tamanho || "Sem tamanho";
+      const epi = episMap[Number(idEpiReal)];
+      const tamanho = tamanhosMap[Number(idTamanhoReal)];
 
-      const chave = `${entrada.idEpi}-${entrada.idTamanho}`;
+      const nomeItem = epi?.nome || `EPI #${idEpiReal || "--"}`;
+      const tamanhoLabel = tamanho?.tamanho || "Sem tamanho";
+
+      const chave = `${idEpiReal}-${idTamanhoReal}`;
 
       if (!mapa[chave]) {
         mapa[chave] = {
           id: chave,
-          idEpi: Number(entrada.idEpi),
-          idTamanho: Number(entrada.idTamanho),
+          idEpi: Number(idEpiReal),
+          idTamanho: Number(idTamanhoReal),
           item: nomeItem,
           tamanho: tamanhoLabel,
           quantidade: 0,
         };
       }
 
-      mapa[chave].quantidade += Number(entrada.quantidadeAtual || 0);
+      mapa[chave].quantidade += qtdAtualReal;
     });
 
     return Object.values(mapa)
-      .filter((item) => Number(item.quantidade) > 0)
-      .sort((a, b) => {
-        if (a.item.localeCompare(b.item) !== 0) {
-          return a.item.localeCompare(b.item);
-        }
-        return String(a.tamanho).localeCompare(String(b.tamanho));
-      });
+      .filter((item) => item.quantidade > 0)
+      .sort((a, b) => a.item.localeCompare(b.item));
   }, [entradas, episMap, tamanhosMap]);
 
   // ======= BLOCO CORRIGIDO: entregasHojeDetalhadas =======

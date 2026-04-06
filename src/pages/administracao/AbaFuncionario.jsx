@@ -10,6 +10,10 @@ export default function AbaFuncionarios() {
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState("");
 
+  // --- ESTADOS DE PAGINAÇÃO ---
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 7;
+
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState(false);
   
@@ -34,7 +38,6 @@ export default function AbaFuncionarios() {
         api.get("/funcoes"),
       ]);
 
-      // Pegando a chave exata que o Raio-X mostrou (singular)
       setFuncionarios(respFunc?.funcionario || []);
       setDepartamentos(respDepto?.departamentos || []);
       setFuncoes(respFuncs?.funcoes || []);
@@ -45,7 +48,6 @@ export default function AbaFuncionarios() {
     }
   };
 
-  // Filtro Inteligente (Agora lendo do caminho exato do Raio-X)
   const funcionariosFiltrados = useMemo(() => {
     const termo = busca.toLowerCase().trim();
     if (!termo) return funcionarios;
@@ -63,22 +65,31 @@ export default function AbaFuncionarios() {
     });
   }, [funcionarios, busca]);
 
-  // Filtra funções no Modal
+  // --- LÓGICA DE PAGINAÇÃO ---
+  const totalPaginas = Math.ceil(funcionariosFiltrados.length / itensPorPagina);
+  
+  const funcionariosPaginados = useMemo(() => {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    return funcionariosFiltrados.slice(inicio, fim);
+  }, [funcionariosFiltrados, paginaAtual]);
+
+  // Reseta para a página 1 ao buscar
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [busca]);
+
   const funcoesDisponiveisForm = funcoes.filter(
     (f) => String(f.departamento?.id) === String(form.id_departamento)
   );
 
- // Função que gera 4 dígitos numéricos aleatórios (0000 a 9999)
-  const gerarMatricula = () => {
-    return Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-  };
 
   const abrirModalNovo = () => {
     setEditando(false);
     setForm({ 
       id: null, 
       nome: "", 
-      matricula: gerarMatricula(), // 👇 Injeta a matrícula gerada aqui!
+      matricula: "AUTOMÁTICA", 
       id_departamento: "", 
       id_funcao: "" 
     });
@@ -87,7 +98,6 @@ export default function AbaFuncionarios() {
 
   const abrirModalEditar = (func) => {
     setEditando(true);
-    // Pegando os IDs que vieram aninhados do banco!
     setForm({
       id: func.id,
       nome: func.nome || "",
@@ -110,10 +120,8 @@ export default function AbaFuncionarios() {
 
     try {
       setSalvando(true);
-      
       const payload = {
         nome: form.nome,
-        matricula: form.matricula,
         id_departamento: Number(form.id_departamento),
         id_funcao: Number(form.id_funcao),
       };
@@ -146,7 +154,6 @@ export default function AbaFuncionarios() {
 
   return (
     <div className="animate-fade-in">
-      {/* HEADER DA PÁGINA */}
       <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
         <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
           <div className="w-full lg:max-w-md">
@@ -179,7 +186,6 @@ export default function AbaFuncionarios() {
         </div>
       </div>
 
-      {/* VERSÃO COMPUTADOR */}
       <div className="hidden lg:block overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
@@ -193,14 +199,14 @@ export default function AbaFuncionarios() {
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {funcionariosFiltrados.length === 0 ? (
+            {funcionariosPaginados.length === 0 ? (
               <tr>
                 <td colSpan="5" className="p-4 text-center text-gray-400 italic">
                   Nenhum funcionário encontrado.
                 </td>
               </tr>
             ) : (
-              funcionariosFiltrados.map((f) => (
+              funcionariosPaginados.map((f) => (
                 <tr key={f.id} className="hover:bg-slate-50">
                   <td className="p-3 text-slate-500 font-mono text-xs">
                     {f.matricula}
@@ -237,14 +243,13 @@ export default function AbaFuncionarios() {
         </table>
       </div>
 
-      {/* VERSÃO CELULAR */}
       <div className="lg:hidden space-y-4">
-        {funcionariosFiltrados.length === 0 ? (
+        {funcionariosPaginados.length === 0 ? (
           <div className="p-4 text-center text-gray-400 italic border rounded-lg">
             Nenhum funcionário encontrado.
           </div>
         ) : (
-          funcionariosFiltrados.map((f) => (
+          funcionariosPaginados.map((f) => (
             <div key={f.id} className="border rounded-lg p-4 bg-white shadow-sm">
               <div>
                 <h3 className="font-bold text-slate-800">{f.nome}</h3>
@@ -259,7 +264,6 @@ export default function AbaFuncionarios() {
                     {f.funcao?.departamento?.departamento || "-"}
                   </span>
                 </div>
-
                 <div className="text-sm text-slate-600 capitalize">
                   <b>Função:</b> {f.funcao?.cargo || "-"}
                 </div>
@@ -284,7 +288,31 @@ export default function AbaFuncionarios() {
         )}
       </div>
 
-      {/* MODAL DE CADASTRO/EDIÇÃO */}
+      {/* CONTROLES DE PAGINAÇÃO */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+            disabled={paginaAtual === 1}
+            className="px-3 py-1 rounded border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            ← Anterior
+          </button>
+          
+          <span className="text-xs font-bold text-slate-500">
+            Página {paginaAtual} de {totalPaginas}
+          </span>
+
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+            disabled={paginaAtual === totalPaginas}
+            className="px-3 py-1 rounded border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
+
       {modalAberto && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
@@ -323,11 +351,9 @@ export default function AbaFuncionarios() {
                   Matrícula (gerada Autom.)
                 </label>
                 <input
-                  // 👇 Colocamos um bg-slate-100, text-slate-500 e cursor-not-allowed para indicar que está bloqueado
                   className="w-full p-3 border rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed outline-none text-sm font-mono font-bold"
                   value={form.matricula}
-                  onChange={(e) => setForm({ ...form, matricula: e.target.value })}
-                  disabled // 👇 Impede que o usuário digite
+                  disabled
                   placeholder="Ex: 4839"
                 />
               </div>

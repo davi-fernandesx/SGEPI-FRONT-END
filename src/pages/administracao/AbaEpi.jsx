@@ -8,27 +8,23 @@ export default function AbaEpis() {
   const [buscaEpi, setBuscaEpi] = useState("");
   const [modalEpiAberto, setModalEpiAberto] = useState(false);
 
+  // --- ESTADOS DE PAGINAÇÃO ---
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 7;
+
   // --- CARREGAMENTO DE DADOS ---
-// --- CARREGAMENTO DE DADOS ---
   const carregarEpis = async () => {
     try {
       setCarregando(true);
       const resposta = await api.get("/epis");
       
-      // Pega a lista do envelope 'Epis'
       const listaBruta = resposta?.Epis || resposta?.data?.Epis || [];
       
-      // LOG DE CONTROLE
       console.log("Dados recebidos do Back-end:", listaBruta);
 
-      // MAPEAMENTO: Ajusta as chaves do Go para o padrão que o seu JSX usa
       const dadosNormalizados = listaBruta.map(epi => ({
         ...epi,
-        // O log mostrou 'CA'. Vamos garantir que o React veja 'ca'
         ca: epi.CA || epi.ca || "N/A",
-        
-        // No Go o campo costuma ser 'ValidadeCa' ou 'validade_CA'
-        // Ajustamos para 'data_validadeCa' que é o que seu JSX usa
         data_validadeCa: epi.ValidadeCa || epi.validade_CA || epi.data_validadeCa || "---"
       }));
 
@@ -50,18 +46,31 @@ export default function AbaEpis() {
     carregarEpis();
   }, []);
 
-const episFiltrados = useMemo(() => {
+  const episFiltrados = useMemo(() => {
     const termo = buscaEpi.toLowerCase().trim();
     if (!termo) return epis;
 
     return epis.filter((epi) => (
       (epi?.nome || "").toLowerCase().includes(termo) ||
       (epi?.fabricante || "").toLowerCase().includes(termo) ||
-      // Agora usamos o 'ca' que normalizamos acima
       String(epi?.ca || "").toLowerCase().includes(termo) ||
       (epi?.protecao?.nome || "").toLowerCase().includes(termo)
     ));
   }, [epis, buscaEpi]);
+
+  // --- LÓGICA DE PAGINAÇÃO ---
+  const totalPaginas = Math.ceil(episFiltrados.length / itensPorPagina);
+  
+  const episPaginados = useMemo(() => {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    return episFiltrados.slice(inicio, fim);
+  }, [episFiltrados, paginaAtual]);
+
+  // Reseta para a página 1 ao buscar
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [buscaEpi]);
 
   return (
     <div className="animate-fade-in p-2 md:p-0">
@@ -114,10 +123,10 @@ const episFiltrados = useMemo(() => {
           <tbody className="divide-y divide-slate-100">
             {carregando ? (
                <tr><td colSpan="7" className="p-10 text-center text-slate-400 font-medium italic">Sincronizando dados...</td></tr>
-            ) : episFiltrados.length === 0 ? (
+            ) : episPaginados.length === 0 ? (
               <tr><td colSpan="7" className="p-10 text-center text-slate-400 italic">Nenhum equipamento encontrado.</td></tr>
             ) : (
-              episFiltrados.map((epi) => (
+              episPaginados.map((epi) => (
                 <tr key={epi.id} className="hover:bg-blue-50/30 transition-colors group">
                   <td className="p-4">
                     <div className="font-bold text-slate-700">{epi.nome}</div>
@@ -145,11 +154,8 @@ const episFiltrados = useMemo(() => {
                       {epi.ca}
                     </span>
                   </td>
-                  <td className="p-4 text-center">
-                    {/* Renderização do Alerta Mínimo */}
-                    <span className="font-bold text-slate-700">
-                      {epi.alerta_minimo ?? 0}
-                    </span>
+                  <td className="p-4 text-center text-slate-700 font-bold">
+                    {epi.alerta_minimo ?? 0}
                   </td>
                   <td className="p-4 text-slate-600 font-semibold">
                     {epi.data_validadeCa}
@@ -165,7 +171,7 @@ const episFiltrados = useMemo(() => {
       <div className="lg:hidden grid grid-cols-1 gap-4">
         {carregando ? (
            <p className="text-center text-slate-400 py-10">Carregando...</p>
-        ) : episFiltrados.map((epi) => (
+        ) : episPaginados.map((epi) => (
           <div key={epi.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             <div className="flex justify-between items-start mb-3">
               <div>
@@ -207,6 +213,31 @@ const episFiltrados = useMemo(() => {
           </div>
         ))}
       </div>
+
+      {/* CONTROLES DE PAGINAÇÃO */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-6 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+            disabled={paginaAtual === 1}
+            className="px-4 py-2 rounded-lg border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            ← Anterior
+          </button>
+          
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            Página {paginaAtual} de {totalPaginas}
+          </span>
+
+          <button
+            onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+            disabled={paginaAtual === totalPaginas}
+            className="px-4 py-2 rounded-lg border bg-white text-slate-600 disabled:opacity-50 text-sm font-bold hover:bg-slate-50 transition"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
 
       {modalEpiAberto && (
         <ModalNovoEpi

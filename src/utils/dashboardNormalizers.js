@@ -18,7 +18,7 @@ export function normalizarEpi(item) {
   return {
     id: Number(item?.id ?? 0),
     nome: String(item?.nome ?? ""),
-    alerta_minimo: Number(item?.alerta_minimo ?? 0),
+    alerta_minimo: Number(item?.alertaMinimo ?? 0),
   };
 }
 
@@ -39,27 +39,26 @@ export function normalizarFuncionario(item) {
 
 export function normalizarEntrada(item) {
   return {
-    id: Number(item?.id ?? 0),
-    idEpi: Number(item?.idEpi ?? 0),
-    idTamanho: Number(item?.idTamanho ?? 0),
-    quantidadeAtual: Number(item?.quantidadeAtual ?? 0),
-    valor_unitario: Number(item?.valor_unitario ?? 0),
-    // Os campos abaixo não são estritamente usados para os cálculos do dashboard principal, 
-    // mas mantive caso você os use dentro dos modais de detalhes
-    quantidade: Number(item?.quantidade ?? 0),
+    // Tenta pegar com I maiúsculo (Go) ou i minúsculo (JS)
+    id: Number(item?.Id),
+    idEpi: Number(item?.IdEpi),
+    idTamanho: Number(item?.IdTamanho),
+    quantidadeAtual: Number(item?.QuantidadeAtual),
+    quantidade: Number(item?.Quantidade),
+    valor_unitario: Number(item?.ValorUnitario),
+    
     data_entrada: converterDataParaISO(
-      item?.data_entrada ?? item?.dataEntrada ?? item?.data_registro
-    ),
-    lote: String(item?.lote ?? ""),
+      item?.DataEntrada),
+    lote: String(item?.Lote ?? item?.lote ?? ""),
   };
 }
 
 export function normalizarEntrega(item) {
   return {
-    id: Number(item?.id ?? 0),
-    idFuncionario: Number(item?.idFuncionario ?? 0),
+    id: Number(item?.Id ?? item?.id ?? 0),
+    idFuncionario: Number(item?.IdFuncionario ?? item?.idFuncionario ?? 0),
     data_entrega: converterDataParaISO(
-      item?.data_entrega ?? item?.dataEntrega ?? item?.data_entrega_epi ?? item?.data
+      item?.DataEntrega ?? item?.data_entrega ?? item?.dataEntrega ?? item?.data
     ),
     // Mantido para os modais, caso você use
     assinatura: item?.assinatura ?? null,
