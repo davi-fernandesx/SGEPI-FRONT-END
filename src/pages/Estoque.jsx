@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import ModalNovoEpi from "../components/modals/ModalNovoEpi";
+// Removido ModalNovoEpi pois o botão de criação foi retirado
 import ModalDetalhesEstoque from "../components/modals/ModalDetalhesEstoque";
 import { api } from "../services/api";
 import { temPermissao } from "../utils/permissoes";
@@ -41,9 +41,8 @@ function getAlertaValidade(status) {
 function Estoque({ usuarioLogado }) {
   const [entradas, setEntradas] = useState([]);
   const [busca, setBusca] = useState("");
-  const [filtroAtivo, setFiltroAtivo] = useState("nome"); // Novo: Critério de busca
+  const [filtroAtivo, setFiltroAtivo] = useState("nome");
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [modalAberto, setModalAberto] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erroTela, setErroTela] = useState("");
   const [itemDetalhe, setItemDetalhe] = useState(null);
@@ -51,8 +50,6 @@ function Estoque({ usuarioLogado }) {
   const itensPorPagina = 6;
 
   const podeVisualizar = temPermissao(usuarioLogado, "visualizar_estoque");
-  const perfilUsuario = usuarioLogado?.perfil || usuarioLogado?.role || "colaborador";
-  const isAdmin = perfilUsuario === "admin";
 
   const carregarProdutos = async () => {
     setCarregando(true);
@@ -74,13 +71,11 @@ function Estoque({ usuarioLogado }) {
     carregarProdutos();
   }, []);
 
-  // FILTRO REFATORADO: Busca específica por coluna selecionada
   const listaFiltrada = useMemo(() => {
     const termo = busca.toLowerCase().trim();
     if (!termo) return entradas;
 
     return entradas.filter((item) => {
-      // Pega o valor do campo dinamicamente baseado no filtroAtivo
       const valorCampo = String(item[filtroAtivo] ?? "").toLowerCase();
       return valorCampo.includes(termo);
     });
@@ -127,7 +122,7 @@ function Estoque({ usuarioLogado }) {
   return (
     <>
       <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-100 max-w-full relative">
-        {/* CABEÇALHO */}
+        {/* CABEÇALHO SEM O BOTÃO NOVO EPI */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -135,14 +130,6 @@ function Estoque({ usuarioLogado }) {
             </h2>
             <p className="text-sm text-gray-500">Visualize lotes, tamanhos e quantidades.</p>
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => setModalAberto(true)}
-              className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm w-full sm:w-auto"
-            >
-              + Novo EPI
-            </button>
-          )}
         </div>
 
         {/* CARDS DE RESUMO */}
@@ -169,7 +156,7 @@ function Estoque({ usuarioLogado }) {
           </div>
         </div>
 
-        {/* NOVA BARRA DE PESQUISA COM FILTRO POR CATEGORIA */}
+        {/* BARRA DE PESQUISA */}
         <div className="flex flex-col md:flex-row mb-6 shadow-sm ring-1 ring-gray-200 rounded-lg overflow-hidden">
           <div className="relative bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200">
             <select
@@ -208,12 +195,11 @@ function Estoque({ usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTEÚDO (TABELA OU CARDS) */}
+        {/* CONTEÚDO */}
         {carregando ? (
           <div className="border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500">Carregando estoque...</div>
         ) : (
           <>
-            {/* VERSÃO DESKTOP */}
             <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
@@ -280,7 +266,6 @@ function Estoque({ usuarioLogado }) {
               </table>
             </div>
 
-            {/* VERSÃO MOBILE */}
             <div className="lg:hidden space-y-4">
               {itensVisiveis.map((item) => (
                 <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
@@ -297,7 +282,6 @@ function Estoque({ usuarioLogado }) {
               ))}
             </div>
 
-            {/* PAGINAÇÃO */}
             {totalPaginas > 1 && (
               <div className="flex justify-between items-center mt-6">
                 <button
@@ -318,16 +302,6 @@ function Estoque({ usuarioLogado }) {
               </div>
             )}
           </>
-        )}
-
-        {modalAberto && isAdmin && (
-          <ModalNovoEpi
-            onClose={() => setModalAberto(false)}
-            onSalvar={async () => {
-              setModalAberto(false);
-              await carregarProdutos();
-            }}
-          />
         )}
       </div>
 
