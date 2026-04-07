@@ -1,158 +1,126 @@
 const DEFAULT_BASE_URL = "https://homolog.radaptech.com.br/api";
 
-console.log("Variável do ENV:", process.env.REACT_APP_API_URL);
-export const BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BASE_URL).replace(
-  /\/+$/,
-  ""
-);
+// 1. BLINDAGEM DA URL: Garante que sempre tenha https:// e evita URLs relativas
+let envUrl = process.env.REACT_APP_API_URL || DEFAULT_BASE_URL;
+
+if (envUrl && !envUrl.startsWith('http')) {
+    envUrl = `https://${envUrl}`;
+}
+
+export const BASE_URL = envUrl.replace(/\/+$/, "");
+
+console.log("BASE_URL configurada para:", BASE_URL);
 
 function normalizarRota(rota = "") {
-  if (!rota) return "";
-  return rota.startsWith("/") ? rota : `/${rota}`;
+    if (!rota) return "";
+    return rota.startsWith("/") ? rota : `/${rota}`;
 }
 
 function getToken() {
-  return localStorage.getItem("token");
+    return localStorage.getItem("token");
 }
+
 function getTenantId() {
-  const hostname = window.location.hostname;
+    const hostname = window.location.hostname;
 
-  // Se você estiver testando na sua máquina (localhost)
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "frigopaiva"; // Força o tenant para você conseguir testar o login
-  }
+    // Se estiver local
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+        return "frigopaiva"; 
+    }
 
-  // Se o front já estiver publicado (ex: frigopaiva.radaptech.com.br)
-  return hostname.split(".")[0]; 
+    const partes = hostname.split(".");
+    
+    // 2. LÓGICA DE TENANT PARA HOMOLOGAÇÃO
+    // Se acessar frigopaiva.homolog.radaptech.com.br -> retorna "frigopaiva"
+    // Se acessar homolog.radaptech.com.br -> retorna "frigopaiva" (fallback para testes)
+    if (partes[0] === "homolog") {
+        return "frigopaiva"; 
+    }
+
+    return partes[0]; 
 }
 
 function isFormData(valor) {
-  return typeof FormData !== "undefined" && valor instanceof FormData;
+    return typeof FormData !== "undefined" && valor instanceof FormData;
 }
 
 function montarHeaders(headersExtras = {}, body = null) {
-  const token = getToken();
-  const tenantId = getTenantId();
-  const headers = { ...headersExtras };
+    const token = getToken();
+    const tenantId = getTenantId();
+    const headers = { ...headersExtras };
 
-  if (!isFormData(body) && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json"
-  }
+    if (!isFormData(body) && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+    }
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
 
-  // NOVO CÓDIGO: Adiciona o header do Tenant se ele existir
-  if (tenantId) {
-    headers["X-tenant-ID"] = tenantId;
-  }
+    if (tenantId) {
+        headers["X-tenant-ID"] = tenantId;
+    }
 
-  return headers;
+    return headers;
 }
 
 function extrairMensagemErro(dados, fallback) {
-  if (!dados) return fallback;
+    if (!dados) return fallback;
+    if (typeof dados === "string") return dados || fallback;
 
-  if (typeof dados === "string") {
-    return dados || fallback;
-  }
-
-  if (typeof dados === "object") {
-    // Pega o erro principal
-    const erroPrincipal = dados.error || dados.erro || dados.message || dados.mensagem || fallback;
-    
-    // Pega os detalhes extras (se existirem)
-    const detalhes = dados.detalhes || dados.detail || dados.details;
-
-    // Se tiver detalhe, junta os dois!
-    if (detalhes) {
-      return `${erroPrincipal} - Detalhes: ${detalhes}`;
+    if (typeof dados === "object") {
+        const erroPrincipal = dados.error || dados.erro || dados.message || dados.mensagem || fallback;
+        const detalhes = dados.detalhes || dados.detail || dados.details;
+        return detalhes ? `${erroPrincipal} - Detalhes: ${detalhes}` : erroPrincipal;
     }
 
-    return erroPrincipal;
-  }
-
-  return fallback;
+    return fallback;
 }
 
 async function lerCorpoResposta(resposta) {
-  if (resposta.status === 204) {
-    return null;
-  }
+    if (resposta.status === 204) return null;
+    const contentType = resposta.headers.get("content-type") || "";
 
-  const contentType = resposta.headers.get("content-type") || "";
-
-  if (contentType.includes("application/json")) {
-    try {
-      return await resposta.json();
-    } catch {
-      return null;
+    if (contentType.includes("application/json")) {
+        try { return await resposta.json(); } catch { return null; }
     }
-  }
-
-  try {
-    return await resposta.text();
-  } catch {
-    return null;
-  }
+    try { return await resposta.text(); } catch { return null; }
 }
 
 async function tratarResposta(resposta, rota, mensagemErroPadrao) {
-  const dados = await lerCorpoResposta(resposta);
-
-  if (!resposta.ok) {
-    const fallback = `${mensagemErroPadrao} ${rota}`;
-    throw new Error(extrairMensagemErro(dados, fallback));
-  }
-
-  return dados;
+    const dados = await lerCorpoResposta(resposta);
+    if (!resposta.ok) {
+        const fallback = `${mensagemErroPadrao} ${rota}`;
+        throw new Error(extrairMensagemErro(dados, fallback));
+    }
+    return dados;
 }
 
 async function request(method, rota, dados = null, headersExtras = {}) {
-  const rotaNormalizada = normalizarRota(rota);
-  const url = `${BASE_URL}${rotaNormalizada}`;
+    const rotaNormalizada = normalizarRota(rota);
+    const url = `${BASE_URL}${rotaNormalizada}`;
 
-  const opcoes = {
-    method,
-    headers: montarHeaders(headersExtras, dados),
-  };
+    const opcoes = {
+        method,
+        headers: montarHeaders(headersExtras, dados),
+    };
 
-  if (dados !== null && dados !== undefined) {
-    opcoes.body = isFormData(dados) ? dados : JSON.stringify(dados);
-  }
+    if (dados !== null && dados !== undefined) {
+        opcoes.body = isFormData(dados) ? dados : JSON.stringify(dados);
+    }
 
-  console.log(`[Requisição API] Disparando ${method} para: ${url}`);
+    console.log(`[Requisição API] Disparando ${method} para: ${url}`);
 
-  const resposta = await fetch(url, opcoes);
-
-  return await tratarResposta(
-    resposta,
-    rotaNormalizada,
-    `Erro ao processar a requisição em`
-  );
+    const resposta = await fetch(url, opcoes);
+    return await tratarResposta(resposta, rotaNormalizada, `Erro ao processar a requisição em`);
 }
 
 export const api = {
-  get: async (rota, headersExtras = {}) => {
-    return await request("GET", rota, null, headersExtras);
-  },
-
-  post: async (rota, dados, headersExtras = {}) => {
-    return await request("POST", rota, dados, headersExtras);
-  },
-
-  put: async (rota, dados, headersExtras = {}) => {
-    return await request("PUT", rota, dados, headersExtras);
-  },
-
-  patch: async (rota, dados, headersExtras = {}) => {
-    return await request("PATCH", rota, dados, headersExtras);
-  },
-
-  delete: async (rota, headersExtras = {}) => {
-    return await request("DELETE", rota, null, headersExtras);
-  },
+    get: (rota, h) => request("GET", rota, null, h),
+    post: (rota, d, h) => request("POST", rota, d, h),
+    put: (rota, d, h) => request("PUT", rota, d, h),
+    patch: (rota, d, h) => request("PATCH", rota, d, h),
+    delete: (rota, h) => request("DELETE", rota, null, h),
 };
 
 export { getToken };
