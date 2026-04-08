@@ -23,7 +23,14 @@ function ModalEntrada({ onClose, onSalvar, usuarioLogado }) {
   const [carregandoDados, setCarregandoDados] = useState(true);
 
   // --- ESTADOS DO FORMULÁRIO (CABEÇALHO) ---
-  const [dataEntrada, setDataEntrada] = useState(new Date().toISOString().split("T")[0]);
+  const [dataEntrada, setDataEntrada] = useState(() => {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoje.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+});
+
   const [fornecedorId, setFornecedorId] = useState("");
   const [notaFiscalNumero, setNotaFiscalNumero] = useState("");
   const [notaFiscalSerie, setNotaFiscalSerie] = useState("");

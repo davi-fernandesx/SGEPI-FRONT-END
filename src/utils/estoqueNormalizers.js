@@ -16,6 +16,7 @@ export function normalizarEntradaCompleta(item) {
     descricao: item?.epi?.descricao ?? "",
     alertaMinimo: item?.epi?.alertaMinimo ?? "-",
     tipoProtecao: item?.epi?.protecao?.nome ?? "-",
+    data_entrada: item?.data_entrada ?? "-",
     
     // Calculado no front
     valorTotal: (item?.quantidade_atual ?? 0) * (item?.valor_unitario ?? 0)

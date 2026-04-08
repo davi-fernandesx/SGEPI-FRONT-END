@@ -12,6 +12,7 @@ export function extrairLista(resp) {
   const listaEncontrada = 
     dados?.Fornecedores || dados?.fornecedores || 
     dados?.Epis || dados?.epis || 
+
     dados?.Entradas || dados?.entradas || 
     dados?.Tamanhos || dados?.tamanhos ||
     dados?.Data || dados?.data || 

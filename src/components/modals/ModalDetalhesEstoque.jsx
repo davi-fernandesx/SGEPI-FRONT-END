@@ -1,7 +1,63 @@
 import { formatarPreco, formatarValidade } from "../../utils/estoqueHelpers";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function ModalDetalhesEstoque({ aberto, item, onClose }) {
   if (!aberto || !item) return null;
+
+ const gerarPDF = () => {
+    const doc = new jsPDF();
+    const dataEmissao = new Date().toLocaleDateString("pt-BR");
+
+    // 1. Cabeçalho do PDF
+    doc.setFontSize(18);
+    doc.text("Dados de Controle de estoque do EPI", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Emitido em: ${dataEmissao}`, 14, 30);
+    doc.text(`Lote: ${item.lote || "N/A"}`, 14, 35);
+
+    doc.setLineWidth(0.5);
+    doc.line(14, 40, 196, 40);
+
+    // 2. Tabela (Chamando a função autoTable diretamente passando o 'doc')
+    const tableBody = [
+      ["Nome do EPI", item.nome],
+      ["Fabricante", item.fabricante || "-"],
+      ["CA", item.ca || "-"],
+      ["Proteção", item.tipoProtecao || "-"],
+      ["Tamanho", item.tamanho || "-"],
+      ["Lote", item.lote || "-"],
+      ["Preço Unit.", formatarPreco(item.preco)],
+      ["Qtd. Atual", String(item.quantidadeAtual)],
+      ["Validade", formatarValidade(item.validade)],
+      ["Entrada no estoque ", item.data_entrada || "-"],
+    ];
+
+    // USAR ASSIM: autoTable(doc, { ... }) em vez de doc.autoTable
+    autoTable(doc, {
+      startY: 45,
+      head: [["Campo", "Informação"]],
+      body: tableBody,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      styles: { fontSize: 10 },
+    });
+
+    // 3. Descrição
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.setTextColor(40);
+    doc.text("Descrição / Observações:", 14, finalY);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    const splitDesc = doc.splitTextToSize(item.descricao || "Sem descrição adicional.", 180);
+    doc.text(splitDesc, 14, finalY + 7);
+
+    doc.save(`EPI_${item.nome.replace(/\s+/g, '_')}.pdf`);
+  };
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
@@ -15,13 +71,23 @@ function ModalDetalhesEstoque({ aberto, item, onClose }) {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-white/10 hover:bg-white/20 transition rounded-lg px-3 py-2 text-sm font-bold"
-            >
-              ✕
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={gerarPDF}
+                className="bg-white/10 hover:bg-emerald-500 transition-colors rounded-lg px-3 py-2 text-sm font-bold flex items-center gap-2 border border-white/20"
+                title="Download PDF"
+              >
+                📥 Baixar PDF
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-white/10 hover:bg-white/20 transition rounded-lg px-3 py-2 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
 

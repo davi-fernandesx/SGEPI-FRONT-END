@@ -1,7 +1,6 @@
 export function normalizarFornecedorEntrada(item) {
   return {
     id: Number(item?.id ?? item?.ID ?? 0),
-    // Use exatamente o que aparece no console.log
     razao_social: item?.razao_social || "", 
     nome_fantasia: item?.nome_fantasia || ""
   };
@@ -12,12 +11,11 @@ export function normalizarEpiEntrada(item) {
     id: Number(item?.id ?? item?.ID ?? 0),
     nome: item?.nome || "",
     ca: item?.ca || "",
-    // Adicione esta linha para capturar os tamanhos permitidos
+    // ADICIONADO: Capturando o fabricante do cadastro do EPI
+    fabricante: item?.fabricante || "-",
     tamanhos: item?.tamanhos || [] 
   };
 }
-
-
 
 export function normalizarTamanhoEntrada(item) {
   return {
@@ -30,15 +28,16 @@ export function normalizarEntrada(item) {
   return {
     id: Number(item?.id ?? 0),
     
-    // IDs (Prioriza o campo direto, mas garante o mapeamento)
+    // IDs
     Idfornecedor: Number(item?.id_fornecedor ?? item?.fornecedor?.id ?? 0),
     IdEpi: Number(item?.id_epi ?? item?.epi?.id ?? 0),
     IdTamanho: Number(item?.id_tamanho ?? item?.tamanho?.id ?? 0),
     
-    // Fallbacks pegando do objeto aninhado que vem no seu JSON
-    // Note que agora acessamos item.epi.nome e item.tamanho.tamanho
+    // Dados do EPI (Mapeando o fabricante aqui também)
     epi_nome_back: item?.epi?.nome || "", 
     epi_ca_back: item?.epi?.ca || "",
+    epi_fabricante_back: item?.epi?.fabricante || "-", // ADICIONADO
+    
     tamanho_nome_back: item?.tamanho?.tamanho || "",
     fornecedor_nome_back: item?.fornecedor?.nome_fantasia || item?.fornecedor?.razao_social || "",
 
@@ -48,6 +47,7 @@ export function normalizarEntrada(item) {
     lote: item?.lote ?? "",
     valor_unitario: Number(item?.valor_unitario ?? 0),
     nota_fiscal_numero: item?.nota_fiscal_numero ?? "",
-    nota_fiscal_serie: item?.nota_fiscal_serie ?? ""
+    nota_fiscal_serie: item?.nota_fiscal_serie ?? "",
+    usuario_entrada: item?.usuario ?? "",
   };
 }
