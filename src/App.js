@@ -13,7 +13,7 @@ import Departamentos from "./pages/Departamentos";
 
 function App() {
   const [usuario, setUsuario] = useState(null);
-  const [paginaAtual, setPaginaAtual] = useState("Administracao");
+  const [paginaAtual, setPaginaAtual] = useState("Dashboard");
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
   useEffect(() => {
@@ -41,14 +41,14 @@ function App() {
     console.log("Usuário recebido no App:", usuarioRecebido);
 
     setUsuario(usuarioRecebido);
-    setPaginaAtual("Administracao");
+    setPaginaAtual("Dashboard");
   };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
     setUsuario(null);
-    setPaginaAtual("Administracao");
+    setPaginaAtual("Dashboard");
   };
 
   if (carregandoSessao) {
