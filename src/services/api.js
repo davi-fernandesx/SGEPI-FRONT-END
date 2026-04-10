@@ -25,7 +25,7 @@ function getTenantId() {
 
     // Se estiver local
     if (hostname === "localhost" || hostname === "127.0.0.1") {
-        return "frigopaiva"; 
+        return "teste"; 
     }
 
     const partes = hostname.split(".");
