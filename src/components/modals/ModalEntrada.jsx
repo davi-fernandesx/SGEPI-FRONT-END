@@ -15,7 +15,7 @@ import {
 
 import { formatarDataParaGo } from "../../utils/entradaHelpers";
 
-function ModalEntrada({ onClose, onSalvar, usuarioLogado }) {
+function ModalEntrada({ onClose, onSalvar }) {
   // --- ESTADOS DE DADOS ---
   const [fornecedores, setFornecedores] = useState([]);
   const [epis, setEpis] = useState([]);
@@ -137,7 +137,6 @@ function ModalEntrada({ onClose, onSalvar, usuarioLogado }) {
         nota_fiscal_numero: String(notaFiscalNumero).trim(),
         nota_fiscal_serie: String(notaFiscalSerie || "1").trim(),
         data_emissao: formatarDataParaGo(dataEntrada),
-        idUser: Number(usuarioLogado?.id || 1),
         
         // MAPEANDO A LISTA DE ITENS (Conforme sua struct EntradaEpiItemInserir)
         itens: itensEntrada.map((item) => ({

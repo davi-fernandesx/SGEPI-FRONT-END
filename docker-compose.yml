@@ -1,0 +1,11 @@
+services: 
+  front:
+    container_name: api_front
+    restart: always
+    build:
+      context: .           # <--- O PULO DO GATO: Define a raiz do projeto como contexto
+      dockerfile: Dockerfile # Aponta onde está o arquivo de build
+    ports:
+      - "3000:3000"
+    env_file:
+      -  .env
